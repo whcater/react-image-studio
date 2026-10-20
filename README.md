@@ -1,5 +1,11 @@
 # react-image-studio
 
+[![npm version](https://img.shields.io/npm/v/react-image-studio.svg?logo=npm&logoColor=white)](https://www.npmjs.com/package/react-image-studio)
+[![npm downloads](https://img.shields.io/npm/dm/react-image-studio.svg)](https://www.npmjs.com/package/react-image-studio)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![CI](https://github.com/whcater/react-image-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/whcater/react-image-studio/actions/workflows/ci.yml)
+[![provenance](https://img.shields.io/badge/provenance-sigstore%20verified-success)](https://www.npmjs.com/package/react-image-studio)
+
 > A feature-rich, **non-destructive** image editor component for React — crop, rotate, flip, colour filters, freehand brush, text layers, zoom/pan and multi-format export. Written in TypeScript, zero runtime dependencies, ships ESM + CJS + type definitions.
 
 ```tsx
