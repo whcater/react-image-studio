@@ -16,6 +16,14 @@
   ],
   "license": "MIT",
   "author": "haione",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/whcater/react-image-studio.git"
+  },
+  "homepage": "https://github.com/whcater/react-image-studio#readme",
+  "bugs": {
+    "url": "https://github.com/whcater/react-image-studio/issues"
+  },
   "type": "module",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
@@ -25,6 +33,11 @@
       "types": "./dist/types/index.d.ts",
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.js"
+    },
+    "./auto-style": {
+      "types": "./dist/auto-style.d.ts",
+      "import": "./dist/auto-style.mjs",
+      "require": "./dist/auto-style.cjs"
     },
     "./style.css": "./dist/style.css",
     "./package.json": "./package.json"
