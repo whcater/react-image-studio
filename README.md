@@ -222,4 +222,4 @@ npm run clean
 
 ## License
 
-MIT © haione
+MIT © whcater
