@@ -3,7 +3,7 @@
  * (No vitest/jest dependency, no native modules.)
  */
 import { spawnSync } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,5 +21,19 @@ if (compiled.status !== 0) {
   process.exit(compiled.status ?? 1);
 }
 
-const run = spawnSync(process.execPath, ['--test', path.join(out, 'tests')], { cwd: root, stdio: 'inherit' });
+// Discover the compiled spec files ourselves: `node --test <dir>` stopped
+// scanning directories in newer Node versions (22+), so pass explicit files.
+const testsDir = path.join(out, 'tests');
+const specs = (await readdir(testsDir))
+  .filter((file) => file.endsWith('.test.js'))
+  .sort()
+  .map((file) => path.join(testsDir, file));
+
+if (specs.length === 0) {
+  console.error(`[test] no compiled specs found in ${testsDir}`);
+  process.exit(1);
+}
+
+console.log(`[test] running ${specs.length} spec files`);
+const run = spawnSync(process.execPath, ['--test', ...specs], { cwd: root, stdio: 'inherit' });
 process.exit(run.status ?? 1);
