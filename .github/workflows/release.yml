@@ -70,11 +70,36 @@ jobs:
             npm publish --dry-run
             exit 0
           fi
+
+          # Preferred path: direct publish. Works with trusted publishing (OIDC),
+          # a bypass-2FA token on an existing package, or an OTP-free account.
           if npm publish --provenance --access public 2>&1 | tee publish.log; then
+            echo "::notice::published ${{ github.event.repository.name }} directly"
             node -p "'published ' + require('./package.json').name + '@' + require('./package.json').version"
-          else
-            if grep -qE 'E403|EOTP|two-factor' publish.log; then
-              echo "::error::npm refused the token (2FA). Create a Classic **Automation** token, or a Granular token with 'Bypass two-factor authentication' enabled, then update the NPM_TOKEN secret."
-            fi
-            exit 1
+            exit 0
           fi
+
+          # Stage-only tokens (the npm default for 2FA accounts since 2026) may
+          # only queue a release; a maintainer approves it with 2FA afterwards.
+          if grep -q 'E_STAGE_REQUIRED' publish.log; then
+            echo "::warning::NPM_TOKEN is stage-only — staging the release for maintainer approval"
+            npm stage publish --provenance 2>&1 | tee stage.log
+            npm stage list 2>&1 | tee -a stage.log || true
+            {
+              echo "### Release staged, waiting for approval"
+              echo ''
+              echo 'The `NPM_TOKEN` in this repository can only stage releases.'
+              echo 'A maintainer must approve it with 2FA:'
+              echo ''
+              echo '```bash'
+              echo 'npm stage list'
+              echo 'npm stage approve <stage-id>   # prompts for the 2FA code'
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if grep -qE 'E403|EOTP|two-factor' publish.log; then
+            echo "::error::npm refused the token (2FA). Use trusted publishing (OIDC), or a token that can bypass 2FA for publishing."
+          fi
+          exit 1
