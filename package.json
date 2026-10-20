@@ -1,0 +1,63 @@
+{
+  "name": "react-image-studio",
+  "version": "1.0.0",
+  "description": "A feature-rich, non-destructive image editor component for React (crop, rotate, filters, brush, text, zoom and export).",
+  "keywords": [
+    "react",
+    "image",
+    "editor",
+    "image-editor",
+    "canvas",
+    "crop",
+    "filters",
+    "photo",
+    "typescript",
+    "component"
+  ],
+  "license": "MIT",
+  "author": "haione",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./style.css": "./dist/style.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "clean": "node ./scripts/clean.mjs",
+    "build": "node ./scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.check.json --noEmit",
+    "test": "node ./scripts/test.mjs",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
+  },
+  "peerDependencies": {
+    "react": ">=17",
+    "react-dom": ">=17"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

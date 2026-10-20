@@ -1,0 +1,13 @@
+# dependencies
+node_modules/
+# build output (published from source, not committed)
+dist/
+.test-build/
+# artefacts
+*.tgz
+*.log
+npm-debug.log*
+.DS_Store
+# editors
+.vscode/
+.idea/
