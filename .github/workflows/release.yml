@@ -32,9 +32,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing (OIDC) needs npm >= 11.5.1; token publishing works
+      # with either version, so upgrading keeps both paths available.
+      - run: npm install -g npm@^11
 
       - run: npm ci
       - run: npm run typecheck
