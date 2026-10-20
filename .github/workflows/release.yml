@@ -2,7 +2,11 @@ name: Release
 
 # Publishes to npm when a version tag is pushed, e.g.:
 #   npm version patch && git push --follow-tags
-# Requires a repository secret named NPM_TOKEN (npm "Automation" token).
+#
+# Requires a repository secret named NPM_TOKEN. It must be a token type that can
+# publish non-interactively: a Classic **Automation** token, or a Granular token
+# with "Bypass two-factor authentication" enabled. Classic "Publish" tokens and
+# granular tokens without that checkbox fail with E403/EOTP.
 on:
   push:
     tags: ['v*']
@@ -12,6 +16,10 @@ on:
         description: 'Run npm publish --dry-run only'
         type: boolean
         default: false
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -36,12 +44,33 @@ jobs:
       - name: Verify tarball contents
         run: npm pack --dry-run
 
+      - name: Check npm credentials
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::The NPM_TOKEN secret is empty. Add an npm Automation token."
+            exit 1
+          fi
+          npm whoami || {
+            echo "::error::npm rejected the token before publishing. Regenerate NPM_TOKEN as an Automation token."
+            exit 1
+          }
+
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -o pipefail
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             npm publish --dry-run
+            exit 0
+          fi
+          if npm publish --provenance --access public 2>&1 | tee publish.log; then
+            node -p "'published ' + require('./package.json').name + '@' + require('./package.json').version"
           else
-            npm publish --provenance --access public
+            if grep -qE 'E403|EOTP|two-factor' publish.log; then
+              echo "::error::npm refused the token (2FA). Create a Classic **Automation** token, or a Granular token with 'Bypass two-factor authentication' enabled, then update the NPM_TOKEN secret."
+            fi
+            exit 1
           fi
