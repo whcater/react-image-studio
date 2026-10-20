@@ -71,11 +71,12 @@ jobs:
             exit 0
           fi
 
-          # Default is staged publishing: npm requires a human with 2FA to
-          # approve every release on accounts that cannot do a non-interactive
-          # publish. Set the repository variable NPM_PUBLISH_MODE=direct once a
-          # trusted publisher (OIDC) with direct publish permission is set up.
-          MODE="${{ vars.NPM_PUBLISH_MODE || 'staged' }}"
+          # Direct publish is the default: it works with this account's token
+          # and with trusted publishing (OIDC). If the token is stage-only the
+          # step falls back to `npm stage publish`, which a maintainer then
+          # approves on npmjs.com. Force either mode with the repository
+          # variable NPM_PUBLISH_MODE=direct|staged.
+          MODE="${{ vars.NPM_PUBLISH_MODE || 'direct' }}"
           echo "publish mode: $MODE"
 
           if [ "$MODE" = "direct" ]; then
