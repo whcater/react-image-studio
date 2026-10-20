@@ -71,35 +71,44 @@ jobs:
             exit 0
           fi
 
-          # Preferred path: direct publish. Works with trusted publishing (OIDC),
-          # a bypass-2FA token on an existing package, or an OTP-free account.
-          if npm publish --provenance --access public 2>&1 | tee publish.log; then
-            echo "::notice::published ${{ github.event.repository.name }} directly"
-            node -p "'published ' + require('./package.json').name + '@' + require('./package.json').version"
-            exit 0
+          # Default is staged publishing: npm requires a human with 2FA to
+          # approve every release on accounts that cannot do a non-interactive
+          # publish. Set the repository variable NPM_PUBLISH_MODE=direct once a
+          # trusted publisher (OIDC) with direct publish permission is set up.
+          MODE="${{ vars.NPM_PUBLISH_MODE || 'staged' }}"
+          echo "publish mode: $MODE"
+
+          if [ "$MODE" = "direct" ]; then
+            if npm publish --provenance --access public 2>&1 | tee publish.log; then
+              echo "::notice::published directly"
+              exit 0
+            fi
+            if grep -q 'E_STAGE_REQUIRED' publish.log; then
+              echo "::warning::token is stage-only — falling back to staged publishing"
+            elif grep -qE 'E403|EOTP|two-factor' publish.log; then
+              echo "::error::npm refused the token (2FA). Set NPM_PUBLISH_MODE=staged, or configure trusted publishing."
+              exit 1
+            else
+              exit 1
+            fi
           fi
 
-          # Stage-only tokens (the npm default for 2FA accounts since 2026) may
-          # only queue a release; a maintainer approves it with 2FA afterwards.
-          if grep -q 'E_STAGE_REQUIRED' publish.log; then
-            echo "::warning::NPM_TOKEN is stage-only — staging the release for maintainer approval"
-            npm stage publish --provenance 2>&1 | tee stage.log
-            npm stage list 2>&1 | tee -a stage.log || true
-            {
-              echo "### Release staged, waiting for approval"
-              echo ''
-              echo 'The `NPM_TOKEN` in this repository can only stage releases.'
-              echo 'A maintainer must approve it with 2FA:'
-              echo ''
-              echo '```bash'
-              echo 'npm stage list'
-              echo 'npm stage approve <stage-id>   # prompts for the 2FA code'
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
+          npm stage publish --provenance 2>&1 | tee stage.log
+          npm stage list 2>&1 | tee -a stage.log || true
 
-          if grep -qE 'E403|EOTP|two-factor' publish.log; then
-            echo "::error::npm refused the token (2FA). Use trusted publishing (OIDC), or a token that can bypass 2FA for publishing."
-          fi
-          exit 1
+          STAGE_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' stage.log | head -1 || true)
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          {
+            echo "### ${NAME}@${VERSION} is staged — approval required"
+            echo ''
+            echo 'npm requires a maintainer with 2FA to approve staged releases.'
+            echo ''
+            echo '- **Web:** open the *Staged Packages* tab on npmjs.com and click **Approve**'
+            echo "- **CLI:** \`npm stage approve ${STAGE_ID:-<stage-id>}\`"
+            echo ''
+            echo '```'
+            echo "stage id: ${STAGE_ID:-see npm stage list}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::staged $NAME@$VERSION${STAGE_ID:+ (stage id $STAGE_ID)} — approve it on npmjs.com"
