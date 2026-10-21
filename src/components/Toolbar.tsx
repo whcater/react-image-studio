@@ -9,7 +9,9 @@ const TOOL_ICONS: Record<ToolId, IconName> = {
   adjust: 'adjust',
   filter: 'filter',
   brush: 'brush',
+  mosaic: 'mosaic',
   text: 'text',
+  marker: 'marker',
   export: 'export',
 };
 

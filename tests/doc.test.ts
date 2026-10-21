@@ -95,7 +95,7 @@ test('strokes and text layers are immutable collections', () => {
 test('pixelDocOf exposes only the pixel-affecting layers', () => {
   const doc = appendStroke(initialDoc(base), stroke);
   const pixel = pixelDocOf(doc);
-  assert.deepEqual(Object.keys(pixel).sort(), ['adjust', 'strokes', 'texts']);
+  assert.deepEqual(Object.keys(pixel).sort(), ['adjust', 'markers', 'strokes', 'texts']);
 });
 
 test('cloneDoc deep copies strokes and text', () => {

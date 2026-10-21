@@ -1,4 +1,4 @@
-import type { Adjustments, Stroke, TextItem } from '../types.js';
+import type { Adjustments, Marker, Stroke, TextItem } from '../types.js';
 import { buildFilterString, isNeutralAdjust } from './filters.js';
 import { createCanvas, get2d } from './image.js';
 
@@ -7,6 +7,7 @@ export interface PixelDoc {
   adjust: Adjustments;
   strokes: Stroke[];
   texts: TextItem[];
+  markers?: Marker[];
 }
 
 export const TEXT_LINE_HEIGHT = 1.25;
@@ -207,7 +208,7 @@ export interface RenderOptions {
   scale?: number;
 }
 
-/** Compose base pixels + strokes + text into `target`, in image coordinates. */
+/** Compose base pixels + brush strokes + text into `target`, in image coordinates. */
 function composeLayers(
   ctx: CanvasRenderingContext2D,
   base: HTMLCanvasElement,
@@ -216,13 +217,14 @@ function composeLayers(
   deviceHeight: number,
 ): void {
   ctx.drawImage(base, 0, 0, base.width, base.height);
-  if (doc.strokes.length > 0) {
+  const brushStrokes = doc.strokes.filter((stroke) => (stroke.kind ?? 'brush') === 'brush');
+  if (brushStrokes.length > 0) {
     const paint = createCanvas(deviceWidth, deviceHeight);
     const paintCtx = get2d(paint);
     // Re-use the caller's scale by drawing in image coordinates.
     const scale = deviceWidth / base.width;
     paintCtx.setTransform(scale, 0, 0, scale, 0, 0);
-    drawStrokesLayer(paintCtx, doc.strokes);
+    drawStrokesLayer(paintCtx, brushStrokes);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(paint, 0, 0);
@@ -231,9 +233,186 @@ function composeLayers(
   for (const item of doc.texts) drawTextItem(ctx, item);
 }
 
+export const DEFAULT_MOSAIC_BLOCK = 12;
+export const DEFAULT_MOSAIC_BLUR = 8;
+
+function traceStrokePath(ctx: CanvasRenderingContext2D, stroke: Stroke): void {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, stroke.size);
+  if (stroke.points.length === 1) {
+    const point = stroke.points[0];
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, Math.max(0.5, stroke.size / 2), 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  for (let i = 1; i < stroke.points.length; i += 1) {
+    ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+  }
+  ctx.stroke();
+}
+
+/**
+ * Redact an already-composed canvas: every mosaic stroke becomes a mask, and
+ * the pixels inside it are replaced by a pixelated or blurred copy of whatever
+ * is underneath (photo, painting or text). Runs in device pixels.
+ */
+export function applyMosaic(target: HTMLCanvasElement, strokes: Stroke[], scale = 1): void {
+  const mosaicStrokes = strokes.filter((stroke) => stroke.kind === 'mosaic');
+  if (mosaicStrokes.length === 0) return;
+
+  const width = target.width;
+  const height = target.height;
+  const ctx = get2d(target);
+
+  // Strokes with the same redaction settings share one mask + effect pass.
+  const groups = new Map<string, Stroke[]>();
+  for (const stroke of mosaicStrokes) {
+    const style = stroke.mosaicStyle === 'blur' ? 'blur' : 'pixelate';
+    const size = style === 'blur' ? stroke.mosaicBlur ?? DEFAULT_MOSAIC_BLUR : stroke.mosaicBlock ?? DEFAULT_MOSAIC_BLOCK;
+    const key = `${style}:${size}`;
+    const list = groups.get(key) ?? [];
+    list.push(stroke);
+    groups.set(key, list);
+  }
+
+  for (const [key, group] of groups) {
+    const [style, rawSize] = key.split(':');
+    const effectSize = Math.max(1, Number(rawSize) || 1);
+
+    const mask = createCanvas(width, height);
+    const maskCtx = get2d(mask);
+    maskCtx.setTransform(scale, 0, 0, scale, 0, 0);
+    maskCtx.strokeStyle = '#000000';
+    maskCtx.fillStyle = '#000000';
+    for (const stroke of group) traceStrokePath(maskCtx, stroke);
+
+    const redacted = createCanvas(width, height);
+    const redactedCtx = get2d(redacted);
+    if (style === 'blur') {
+      redactedCtx.filter = `blur(${Math.max(1, effectSize * scale).toFixed(2)}px)`;
+      redactedCtx.drawImage(target, 0, 0);
+      redactedCtx.filter = 'none';
+    } else {
+      const block = Math.max(2, Math.round(effectSize * scale));
+      const small = createCanvas(Math.max(1, Math.ceil(width / block)), Math.max(1, Math.ceil(height / block)));
+      get2d(small).drawImage(target, 0, 0, small.width, small.height);
+      redactedCtx.imageSmoothingEnabled = false;
+      redactedCtx.drawImage(small, 0, 0, width, height);
+      redactedCtx.imageSmoothingEnabled = true;
+    }
+
+    maskCtx.setTransform(1, 0, 0, 1, 0, 0);
+    maskCtx.globalCompositeOperation = 'source-in';
+    maskCtx.drawImage(redacted, 0, 0);
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(mask, 0, 0);
+    ctx.restore();
+  }
+}
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.arcTo(x + width, y, x + width, y + r, r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r);
+  ctx.lineTo(x + r, y + height);
+  ctx.arcTo(x, y + height, x, y + height - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+/** Contrast-aware text colour so badges stay readable on light colours. */
+export function readableTextColor(color: string): string {
+  const hex = color.replace('#', '');
+  const full =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((char) => char + char)
+          .join('')
+      : hex.padEnd(6, '0').slice(0, 6);
+  const r = Number.parseInt(full.slice(0, 2), 16) || 0;
+  const g = Number.parseInt(full.slice(2, 4), 16) || 0;
+  const b = Number.parseInt(full.slice(4, 6), 16) || 0;
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance > 0.62 ? '#101828' : '#ffffff';
+}
+
+/** Draw one numbered step marker. Assumes the context is in image coordinates. */
+export function drawMarker(ctx: CanvasRenderingContext2D, marker: Marker): void {
+  const radius = marker.size / 2;
+  const ring = Math.max(1, marker.size * 0.08);
+  ctx.save();
+  ctx.translate(marker.x, marker.y);
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = marker.size * 0.12;
+  ctx.shadowOffsetY = marker.size * 0.05;
+  ctx.fillStyle = marker.color;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = ring;
+
+  if (marker.shape === 'square') {
+    roundRectPath(ctx, -radius, -radius, marker.size, marker.size, marker.size * 0.24);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
+  } else if (marker.shape === 'ring') {
+    ctx.shadowColor = 'transparent';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius - ring / 2, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = ring;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius - ring, 0, Math.PI * 2);
+    ctx.strokeStyle = marker.color;
+    ctx.lineWidth = Math.max(1, marker.size * 0.14);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.stroke();
+  }
+
+  ctx.shadowColor = 'transparent';
+  ctx.font = `700 ${Math.max(8, Math.round(marker.size * 0.5))}px Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const label = String(marker.number);
+  if (marker.shape === 'ring') {
+    ctx.lineWidth = Math.max(1, marker.size * 0.07);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.strokeText(label, 0, marker.size * 0.02);
+    ctx.fillStyle = '#ffffff';
+  } else {
+    ctx.fillStyle = readableTextColor(marker.color);
+  }
+  ctx.fillText(label, 0, marker.size * 0.02);
+  ctx.restore();
+}
+
 /**
  * Flatten a committed base bitmap plus the non-destructive layers
- * (strokes, text, colour adjustments) into a fresh canvas.
+ * (strokes, text, mosaic, markers, colour adjustments) into a fresh canvas.
  */
 export function renderDoc(base: HTMLCanvasElement, doc: PixelDoc, options: RenderOptions = {}): HTMLCanvasElement {
   const scale = Math.min(1, Math.max(0.01, options.scale ?? 1));
@@ -245,20 +424,32 @@ export function renderDoc(base: HTMLCanvasElement, doc: PixelDoc, options: Rende
   const ctx = get2d(out);
 
   const filter = supportsContextFilter() && !isNeutralAdjust(doc.adjust) ? buildFilterString(doc.adjust) : '';
+  // With a filter everything must be composed first and blitted once.
+  const stage = filter ? createCanvas(deviceWidth, deviceHeight) : out;
+  const stageCtx = get2d(stage);
+  const scaleX = deviceWidth / width;
+  const scaleY = deviceHeight / height;
+
+  stageCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+  composeLayers(stageCtx, base, doc, deviceWidth, deviceHeight);
+
+  // Mosaic is a post-process on the composed pixels: it hides what is beneath.
+  applyMosaic(stage, doc.strokes, scaleX);
+
+  // Markers are annotations and always stay on top.
+  if (doc.markers && doc.markers.length > 0) {
+    stageCtx.save();
+    stageCtx.setTransform(scaleX, 0, 0, scaleY, 0, 0);
+    for (const marker of doc.markers) drawMarker(stageCtx, marker);
+    stageCtx.restore();
+  }
 
   if (filter) {
-    // Everything must be filtered together, so compose first and blit once.
-    const stage = createCanvas(deviceWidth, deviceHeight);
-    const stageCtx = get2d(stage);
-    stageCtx.setTransform(deviceWidth / width, 0, 0, deviceHeight / height, 0, 0);
-    composeLayers(stageCtx, base, doc, deviceWidth, deviceHeight);
     ctx.filter = filter;
     ctx.drawImage(stage, 0, 0);
     ctx.filter = 'none';
-  } else {
-    ctx.setTransform(deviceWidth / width, 0, 0, deviceHeight / height, 0, 0);
-    composeLayers(ctx, base, doc, deviceWidth, deviceHeight);
-    if (!isNeutralAdjust(doc.adjust)) applyPixelAdjustments(ctx, deviceWidth, deviceHeight, doc.adjust);
+  } else if (!isNeutralAdjust(doc.adjust)) {
+    applyPixelAdjustments(ctx, deviceWidth, deviceHeight, doc.adjust);
   }
 
   applyWarmth(ctx, deviceWidth, deviceHeight, doc.adjust.warmth);

@@ -1,4 +1,4 @@
-import type { Adjustments, AdjustKey, EditorDoc, Stroke, TextItem } from '../types.js';
+import type { Adjustments, AdjustKey, EditorDoc, Marker, MarkerShape, Stroke, StrokeKind, TextItem } from '../types.js';
 import { neutralAdjustments, sanitizeAdjustments } from './filters.js';
 import type { PixelDoc } from './render.js';
 
@@ -17,6 +17,7 @@ export function initialDoc(base: HTMLCanvasElement): EditorDoc {
     adjust: neutralAdjustments(),
     strokes: [],
     texts: [],
+    markers: [],
     preset: null,
     rotation: 0,
     flipH: false,
@@ -26,7 +27,7 @@ export function initialDoc(base: HTMLCanvasElement): EditorDoc {
 
 /** The subset of the document that affects pixels. */
 export function pixelDocOf(doc: EditorDoc): PixelDoc {
-  return { adjust: doc.adjust, strokes: doc.strokes, texts: doc.texts };
+  return { adjust: doc.adjust, strokes: doc.strokes, texts: doc.texts, markers: doc.markers };
 }
 
 export function withAdjust(doc: EditorDoc, key: AdjustKey, value: number): EditorDoc {
@@ -41,9 +42,14 @@ export function appendStroke(doc: EditorDoc, stroke: Stroke): EditorDoc {
   return { ...doc, strokes: [...doc.strokes, stroke] };
 }
 
-export function clearStrokes(doc: EditorDoc): EditorDoc {
-  if (doc.strokes.length === 0) return doc;
-  return { ...doc, strokes: [] };
+/** `'brush'` and `'mosaic'` strokes share one list but behave differently. */
+export const strokeKindOf = (stroke: Stroke): StrokeKind => stroke.kind ?? 'brush';
+
+/** Remove every stroke of the given kind (brush painting or mosaic redaction). */
+export function clearStrokes(doc: EditorDoc, kind: StrokeKind = 'brush'): EditorDoc {
+  const strokes = doc.strokes.filter((stroke) => strokeKindOf(stroke) !== kind);
+  if (strokes.length === doc.strokes.length) return doc;
+  return { ...doc, strokes };
 }
 
 export function upsertText(doc: EditorDoc, item: TextItem): EditorDoc {
@@ -73,6 +79,63 @@ export function clearTexts(doc: EditorDoc): EditorDoc {
   return { ...doc, texts: [] };
 }
 
+// ---------------------------------------------------------------------------
+// Markers (numbered step annotations)
+// ---------------------------------------------------------------------------
+
+/** The next number to hand out: one past the highest badge in use. */
+export function nextMarkerNumber(doc: EditorDoc): number {
+  return doc.markers.reduce((max, marker) => Math.max(max, marker.number), 0) + 1;
+}
+
+export function appendMarker(doc: EditorDoc, marker: Marker): EditorDoc {
+  return { ...doc, markers: [...doc.markers, marker] };
+}
+
+export function updateMarker(doc: EditorDoc, id: string, patch: Partial<Marker>): EditorDoc {
+  const index = doc.markers.findIndex((marker) => marker.id === id);
+  if (index === -1) return doc;
+  const markers = doc.markers.slice();
+  markers[index] = { ...markers[index], ...patch };
+  return { ...doc, markers };
+}
+
+export function removeMarker(doc: EditorDoc, id: string): EditorDoc {
+  const markers = doc.markers.filter((marker) => marker.id !== id);
+  if (markers.length === doc.markers.length) return doc;
+  return { ...doc, markers };
+}
+
+export function clearMarkers(doc: EditorDoc): EditorDoc {
+  if (doc.markers.length === 0) return doc;
+  return { ...doc, markers: [] };
+}
+
+/**
+ * Re-assign badge numbers in reading order (top row first, then left to right),
+ * which is what tutorial screenshots usually need after editing.
+ */
+export function renumberMarkers(doc: EditorDoc): EditorDoc {
+  if (doc.markers.length === 0) return doc;
+  const rowHeight = Math.max(1, Math.min(doc.width, doc.height) * 0.08);
+  const ordered = doc.markers
+    .map((marker, index) => ({ marker, index }))
+    .sort((a, b) => {
+      const rowA = Math.floor(a.marker.y / rowHeight);
+      const rowB = Math.floor(b.marker.y / rowHeight);
+      if (rowA !== rowB) return rowA - rowB;
+      if (a.marker.y !== b.marker.y) return a.marker.y - b.marker.y;
+      if (a.marker.x !== b.marker.x) return a.marker.x - b.marker.x;
+      return a.index - b.index;
+    });
+  const numbers = new Map<string, number>();
+  ordered.forEach((entry, position) => numbers.set(entry.marker.id, position + 1));
+  return {
+    ...doc,
+    markers: doc.markers.map((marker) => ({ ...marker, number: numbers.get(marker.id) ?? marker.number })),
+  };
+}
+
 /** Deep copy so callers can never mutate internal state. */
 export function cloneDoc(doc: EditorDoc): EditorDoc {
   return {
@@ -80,6 +143,7 @@ export function cloneDoc(doc: EditorDoc): EditorDoc {
     adjust: { ...doc.adjust },
     strokes: doc.strokes.map((stroke) => ({ ...stroke, points: stroke.points.map((p) => ({ ...p })) })),
     texts: doc.texts.map((item) => ({ ...item })),
+    markers: doc.markers.map((marker) => ({ ...marker })),
   };
 }
 
@@ -101,6 +165,10 @@ export function normalizeDoc(input: Partial<EditorDoc>, width: number, height: n
             size: Number.isFinite(stroke.size) ? stroke.size : 12,
             opacity: Number.isFinite(stroke.opacity) ? stroke.opacity : 100,
             erase: stroke.erase === true,
+            ...(stroke.kind === 'mosaic' ? { kind: 'mosaic' as const } : {}),
+            ...(Number.isFinite(stroke.mosaicBlock) ? { mosaicBlock: Math.max(2, stroke.mosaicBlock as number) } : {}),
+            ...(stroke.mosaicStyle === 'blur' ? { mosaicStyle: 'blur' as const } : {}),
+            ...(Number.isFinite(stroke.mosaicBlur) ? { mosaicBlur: Math.max(1, stroke.mosaicBlur as number) } : {}),
           }))
           .filter((stroke) => stroke.points.length > 0)
       : [],
@@ -122,6 +190,19 @@ export function normalizeDoc(input: Partial<EditorDoc>, width: number, height: n
             opacity: Number.isFinite(item.opacity) ? item.opacity : 100,
           }))
       : [],
+    markers: Array.isArray(input.markers)
+      ? input.markers
+          .filter((marker): marker is Marker => !!marker && Number.isFinite(marker.x) && Number.isFinite(marker.y))
+          .map((marker, index) => ({
+            id: typeof marker.id === 'string' ? marker.id : createId('marker'),
+            x: marker.x,
+            y: marker.y,
+            number: Number.isFinite(marker.number) ? Math.max(1, Math.round(marker.number)) : index + 1,
+            color: typeof marker.color === 'string' ? marker.color : '#ef4444',
+            size: Number.isFinite(marker.size) ? Math.min(2000, Math.max(12, marker.size)) : 120,
+            shape: (['circle', 'square', 'ring'] as MarkerShape[]).includes(marker.shape) ? marker.shape : 'circle',
+          }))
+      : [],
     preset: typeof input.preset === 'string' ? input.preset : null,
     rotation: Number.isFinite(input.rotation) ? (input.rotation as number) : 0,
     flipH: input.flipH === true,
@@ -140,6 +221,7 @@ export function isPristine(doc: EditorDoc, strokesFlag = true, textsFlag = true)
     adjustUntouched &&
     doc.preset === null &&
     (!strokesFlag || doc.strokes.length === 0) &&
-    (!textsFlag || doc.texts.length === 0)
+    (!textsFlag || doc.texts.length === 0) &&
+    doc.markers.length === 0
   );
 }

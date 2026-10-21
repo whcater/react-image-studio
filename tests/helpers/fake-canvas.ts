@@ -105,6 +105,12 @@ export class FakeContext {
   putImageData(...args: unknown[]): void {
     this.record('putImageData', ...args);
   }
+  strokeText(text: string, ...args: number[]): void {
+    this.record("strokeText", text, ...args);
+  }
+  arcTo(...args: number[]): void {
+    this.record("arcTo", ...args);
+  }
   createLinearGradient(): FakeGradient {
     return new FakeGradient();
   }

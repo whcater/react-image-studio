@@ -3,6 +3,24 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-10-21
+
+### Added
+- **Mosaic tool** (`mosaic`): brush-based redaction with a pixelate or blur style, adjustable
+  brush size, block size and blur strength. The redaction is applied to the composed pixels,
+  so it hides photos, painting and text underneath, and it survives rotation, flipping and cropping.
+- **Step marker tool** (`marker`): click the image to drop auto-numbered badges (circle, square
+  or ring), drag to move, with per-marker colour and size, `Delete` to remove and
+  "Renumber from top-left" to re-sort badges into reading order.
+- `Marker`, `MarkerSettings`, `MarkerShape`, `MosaicSettings`, `MosaicStyle` and `StrokeKind`
+  are exported, together with `DEFAULT_MARKER` and `DEFAULT_MOSAIC`.
+- `EditorDoc.markers` is part of the serialisable document; `Stroke` gained an optional
+  `kind` (`brush` | `mosaic`) plus `mosaicStyle`, `mosaicBlock` and `mosaicBlur`.
+
+### Changed
+- `clearStrokes()` clears brush painting only; use `clearMosaic()` for redaction strokes.
+- Markers and mosaic strokes follow rotate, flip and crop, like text and painting.
+
 ## [1.0.0] — 2026-10-20
 
 First public release.

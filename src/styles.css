@@ -1003,3 +1003,30 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ------------------------------------------------------- markers & mosaic */
+
+.ris-marker-box {
+  position: absolute;
+  border: 1.5px dashed rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.ris-marker-box.is-square {
+  border-radius: 22%;
+}
+
+.ris-marker-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.65);
+}

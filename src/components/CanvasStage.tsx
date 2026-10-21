@@ -15,7 +15,7 @@ import {
 import { createId } from '../core/doc.js';
 import { measureTextItem } from '../core/render.js';
 import { findAspect } from '../i18n.js';
-import type { CropHandle, Point, Rect, Stroke, TextItem } from '../types.js';
+import type { CropHandle, Marker, Point, Rect, Stroke, TextItem } from '../types.js';
 import { Button } from './ui.js';
 
 type Gesture =
@@ -25,6 +25,7 @@ type Gesture =
   | { type: 'crop-new'; startImage: Point }
   | { type: 'brush'; stroke: Stroke }
   | { type: 'text'; id: string; startImage: Point; origin: Point }
+  | { type: 'marker'; id: string; startImage: Point; origin: Point }
   | null;
 
 const HANDLES: CropHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -53,6 +54,16 @@ function hitTestTexts(texts: TextItem[], point: Point): string | null {
     ) {
       return item.id;
     }
+  }
+  return null;
+}
+
+/** Topmost marker under the cursor; `tolerance` is in image pixels. */
+function hitTestMarkers(markers: Marker[], point: Point, tolerance: number): string | null {
+  for (let i = markers.length - 1; i >= 0; i -= 1) {
+    const marker = markers[i];
+    const radius = Math.max(marker.size / 2, tolerance);
+    if (Math.hypot(point.x - marker.x, point.y - marker.y) <= radius) return marker.id;
   }
   return null;
 }
@@ -221,8 +232,14 @@ export function CanvasStage() {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.lineWidth = stroke.size;
-      ctx.strokeStyle = stroke.erase ? 'rgba(255,255,255,0.55)' : stroke.color;
-      ctx.globalAlpha = stroke.erase ? 0.7 : stroke.opacity / 100;
+      const isMosaic = stroke.kind === 'mosaic';
+      const previewColor = stroke.erase
+        ? 'rgba(255, 255, 255, 0.55)'
+        : isMosaic
+          ? 'rgba(120, 180, 255, 0.45)'
+          : stroke.color;
+      ctx.strokeStyle = previewColor;
+      ctx.globalAlpha = stroke.erase ? 0.7 : isMosaic ? 0.85 : stroke.opacity / 100;
       if (from) {
         ctx.beginPath();
         ctx.moveTo(from.x, from.y);
@@ -231,7 +248,7 @@ export function CanvasStage() {
       } else {
         ctx.beginPath();
         ctx.arc(to.x, to.y, stroke.size / 2, 0, Math.PI * 2);
-        ctx.fillStyle = stroke.erase ? 'rgba(255,255,255,0.55)' : stroke.color;
+        ctx.fillStyle = previewColor;
         ctx.fill();
       }
       ctx.restore();
@@ -330,6 +347,49 @@ export function CanvasStage() {
         return;
       }
 
+      if (tool === 'mosaic') {
+        const stroke: Stroke = {
+          id: createId('stroke'),
+          points: [image],
+          color: '#000000',
+          size: api.mosaic.size,
+          opacity: 100,
+          erase: false,
+          kind: 'mosaic',
+          mosaicStyle: api.mosaic.style,
+          mosaicBlock: api.mosaic.block,
+          mosaicBlur: api.mosaic.blur,
+        };
+        gestureRef.current = { type: 'brush', stroke };
+        clearOverlay();
+        drawOverlaySegment(stroke, null, image);
+        event.preventDefault();
+        return;
+      }
+
+      if (tool === 'marker' && doc) {
+        const tolerance = 16 / view.scale;
+        const hitId = hitTestMarkers(doc.markers, image, tolerance);
+        if (hitId) {
+          const item = doc.markers.find((entry) => entry.id === hitId);
+          if (item) {
+            api.selectMarker(hitId);
+            api.beginTransient();
+            gestureRef.current = { type: 'marker', id: hitId, startImage: image, origin: { x: item.x, y: item.y } };
+            event.preventDefault();
+            return;
+          }
+        }
+        // Empty space: drop a new numbered step marker right where the user clicked.
+        const created = api.addMarker({ x: Math.round(image.x), y: Math.round(image.y) });
+        if (created) {
+          gestureRef.current = { type: 'marker', id: created.id, startImage: image, origin: { x: created.x, y: created.y } };
+          api.beginTransient();
+        }
+        event.preventDefault();
+        return;
+      }
+
       if (tool === 'text' && doc) {
         const hitId = hitTestTexts(doc.texts, image);
         if (hitId) {
@@ -412,6 +472,17 @@ export function CanvasStage() {
           );
           break;
         }
+        case 'marker': {
+          api.updateMarker(
+            gesture.id,
+            {
+              x: gesture.origin.x + (image.x - gesture.startImage.x),
+              y: gesture.origin.y + (image.y - gesture.startImage.y),
+            },
+            true,
+          );
+          break;
+        }
         default:
           break;
       }
@@ -437,7 +508,7 @@ export function CanvasStage() {
       if (gesture.type === 'brush') {
         clearOverlay();
         if (gesture.stroke.points.length > 0) api.addStroke(gesture.stroke);
-      } else if (gesture.type === 'text') {
+      } else if (gesture.type === 'text' || gesture.type === 'marker') {
         api.endTransient();
       } else if (gesture.type === 'crop-new' || gesture.type === 'crop-resize') {
         const rect = api.cropRect;
@@ -491,12 +562,28 @@ export function CanvasStage() {
     };
   }, [api.selectedTextId, doc, view]);
 
+  const selectedMarkerScreen = useMemo(() => {
+    if (!doc || !api.selectedMarkerId) return null;
+    const marker = doc.markers.find((entry) => entry.id === api.selectedMarkerId);
+    if (!marker) return null;
+    const topLeft = imageToScreen({ x: marker.x - marker.size / 2, y: marker.y - marker.size / 2 }, view);
+    return {
+      left: topLeft.x,
+      top: topLeft.y,
+      width: marker.size * view.scale,
+      height: marker.size * view.scale,
+      shape: marker.shape,
+    };
+  }, [api.selectedMarkerId, doc, view]);
+
   const cursor = (() => {
     if (panning) return 'grabbing';
     if (tool === 'move') return 'grab';
     if (tool === 'brush') return 'crosshair';
+    if (tool === 'mosaic') return 'crosshair';
     if (tool === 'crop') return 'crosshair';
     if (tool === 'text') return 'text';
+    if (tool === 'marker') return 'copy';
     return 'grab';
   })();
 
@@ -562,6 +649,19 @@ export function CanvasStage() {
             height: selectedTextScreen.height,
             transform: `rotate(${selectedTextScreen.rotation}deg)`,
             transformOrigin: 'top left',
+          }}
+          aria-hidden="true"
+        />
+      ) : null}
+
+      {selectedMarkerScreen && tool === 'marker' ? (
+        <div
+          className={`ris-marker-box${selectedMarkerScreen.shape === 'square' ? ' is-square' : ''}`}
+          style={{
+            left: selectedMarkerScreen.left,
+            top: selectedMarkerScreen.top,
+            width: selectedMarkerScreen.width,
+            height: selectedMarkerScreen.height,
           }}
           aria-hidden="true"
         />

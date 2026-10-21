@@ -30,6 +30,8 @@ export default function App() {
 | **Adjust** | Brightness, contrast, saturation, warmth, hue, blur, grayscale, sepia, invert, opacity — double-click a value to reset it |
 | **Filters** | 12 live presets (Vivid, Warm, Cool, Mono, Noir, Sepia, Vintage, Dramatic, Fade, Sunset, Matrix…) rendered as real thumbnails of your image |
 | **Brush** | Colour, size, opacity and an eraser that only removes paint (never the photo), unlimited strokes with undo |
+| **Mosaic** | Brush-based redaction: pixelate (adjustable block size) or blur, adjustable brush, hides photos, painting and text |
+| **Markers** | Numbered step badges (circle/square/ring) for tutorials and screenshots, drag to move, auto-numbering + "renumber from top-left" |
 | **Text** | Multiple text layers, drag to move, font/size/colour/weight/italic/align/rotation/opacity, double-click to edit |
 | **Navigation** | Wheel & pinch zoom to a focal point, drag to pan, fit-to-screen, actual-size, double-click reset |
 | **History** | 60-step undo/redo with sensible coalescing (a slider drag is one step) |
@@ -222,7 +224,7 @@ Remote images are fetched with `crossOrigin="anonymous"` so exports stay untaint
 ```bash
 npm run build      # ESM + CJS + d.ts + style.css
 npm run typecheck  # strict tsc, no emit
-npm test           # node:test suite (72 tests)
+npm test           # node:test suite (89 tests)
 npm run clean
 ```
 

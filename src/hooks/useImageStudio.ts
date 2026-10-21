@@ -6,6 +6,9 @@ import type {
   ExportFormat,
   ImageStudioProps,
   Labels,
+  Marker,
+  MarkerSettings,
+  MosaicSettings,
   Point,
   Rect,
   SaveResult,
@@ -16,13 +19,19 @@ import type {
 } from '../types.js';
 import { resolveLabels, findAspect } from '../i18n.js';
 import {
+  appendMarker,
   appendStroke,
+  clearMarkers as clearMarkersInDoc,
   clearStrokes as clearStrokesInDoc,
   cloneDoc,
   createId,
   initialDoc,
+  nextMarkerNumber,
   normalizeDoc,
+  removeMarker as removeMarkerInDoc,
   removeText as removeTextInDoc,
+  renumberMarkers as renumberMarkersInDoc,
+  updateMarker as updateMarkerInDoc,
   updateText as updateTextInDoc,
   upsertText,
   withAdjust,
@@ -63,13 +72,28 @@ import { clampView, clampZoom, centeredAspectRect, fitView, roundRect, zoomAt, t
 
 export type EditorStatus = 'empty' | 'loading' | 'ready' | 'error';
 
-export const ALL_TOOLS: ToolId[] = ['move', 'crop', 'rotate', 'adjust', 'filter', 'brush', 'text', 'export'];
+export const ALL_TOOLS: ToolId[] = ['move', 'crop', 'rotate', 'adjust', 'filter', 'brush', 'mosaic', 'text', 'marker', 'export'];
 
 export const DEFAULT_BRUSH: BrushSettings = {
   color: '#ff3b30',
   size: 24,
   opacity: 100,
   erase: false,
+};
+
+/** Step-marker defaults: a 120px red circle with a white numeral. */
+export const DEFAULT_MARKER: MarkerSettings = {
+  color: '#ef4444',
+  size: 120,
+  shape: 'circle',
+};
+
+/** Mosaic defaults: a broad brush with a 14px pixelate block. */
+export const DEFAULT_MOSAIC: MosaicSettings = {
+  size: 90,
+  style: 'pixelate',
+  block: 14,
+  blur: 10,
 };
 
 export const DEFAULT_TEXT_STYLE: Omit<TextItem, 'id' | 'text' | 'x' | 'y'> = {
@@ -140,7 +164,23 @@ export interface StudioApi {
   brush: BrushSettings;
   setBrush: (patch: Partial<BrushSettings>) => void;
   addStroke: (stroke: Stroke) => void;
+  /** Clears brush painting only (mosaic strokes are kept). */
   clearStrokes: () => void;
+
+  mosaic: MosaicSettings;
+  setMosaic: (patch: Partial<MosaicSettings>) => void;
+  /** Removes every mosaic stroke. */
+  clearMosaic: () => void;
+
+  marker: MarkerSettings;
+  setMarker: (patch: Partial<MarkerSettings>) => void;
+  selectedMarkerId: string | null;
+  selectMarker: (id: string | null) => void;
+  addMarker: (patch?: Partial<Marker>) => Marker | null;
+  updateMarker: (id: string, patch: Partial<Marker>, merge?: boolean) => void;
+  removeMarker: (id: string) => void;
+  clearMarkers: () => void;
+  renumberMarkers: () => void;
 
   selectedTextId: string | null;
   selectText: (id: string | null) => void;
@@ -199,6 +239,9 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
   const [view, setView] = useState<ViewTransform>({ scale: 1, x: 0, y: 0 });
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   const [brush, setBrushState] = useState<BrushSettings>(DEFAULT_BRUSH);
+  const [mosaic, setMosaicState] = useState<MosaicSettings>(DEFAULT_MOSAIC);
+  const [marker, setMarkerSettings] = useState<MarkerSettings>(DEFAULT_MARKER);
+  const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [textStyle, setTextStyleState] = useState(DEFAULT_TEXT_STYLE);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [format, setFormat] = useState<ExportFormat>(props.defaultFormat ?? 'png');
@@ -248,15 +291,16 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
    */
   const strokes = doc?.strokes;
   const texts = doc?.texts;
+  const markers = doc?.markers;
   const layer = useMemo(() => {
-    if (!base || !strokes || !texts) return null;
+    if (!base || !strokes || !texts || !markers) return null;
     if (!filterSupported) return null;
     return renderDoc(
       base,
-      { adjust: neutralAdjustments(), strokes, texts },
+      { adjust: neutralAdjustments(), strokes, texts, markers },
       { scale: previewScaleFor({ width: base.width, height: base.height }) },
     );
-  }, [base, strokes, texts, filterSupported]);
+  }, [base, strokes, texts, markers, filterSupported]);
 
   const preview = useMemo(() => {
     if (!base || !doc || filterSupported) return null;
@@ -483,6 +527,11 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
         return { ...stroke, points };
       });
       const texts = doc.texts.map((item, index) => ({ ...item, x: mapped.texts[index].x, y: mapped.texts[index].y, rotation: mapped.texts[index].rotation }));
+      const markers = rotateOverlays(
+        { points: [], texts: doc.markers.map((item) => ({ x: item.x, y: item.y, rotation: 0 })) },
+        direction * 90,
+        { width: base.width, height: base.height },
+      ).texts.map((mappedItem, index) => ({ ...doc.markers[index], x: mappedItem.x, y: mappedItem.y }));
       const nextDoc: EditorDoc = {
         ...doc,
         width: nextBase.width,
@@ -490,6 +539,7 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
         rotation: (doc.rotation + direction * 90 + 360) % 360,
         strokes,
         texts,
+        markers,
       };
       commitStructural(nextBase, nextDoc);
       setSelectedTextId(null);
@@ -527,6 +577,7 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
         flipV: axis === 'vertical' ? !doc.flipV : doc.flipV,
         strokes,
         texts,
+        markers: doc.markers.map((item) => ({ ...item, ...flipOverlays([{ x: item.x, y: item.y }], axis, size)[0] })),
       };
       commitStructural(nextBase, nextDoc);
     },
@@ -542,9 +593,11 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
       const dy = Math.max(0, Math.round(rect.y));
       const strokes = doc.strokes.map((stroke) => ({ ...stroke, points: offsetOverlays(stroke.points, dx, dy) }));
       const texts = doc.texts.map((item) => ({ ...item, ...offsetOverlays([{ x: item.x, y: item.y }], dx, dy)[0] }));
-      const nextDoc: EditorDoc = { ...doc, width: nextBase.width, height: nextBase.height, strokes, texts };
+      const markers = doc.markers.map((item) => ({ ...item, ...offsetOverlays([{ x: item.x, y: item.y }], dx, dy)[0] }));
+      const nextDoc: EditorDoc = { ...doc, width: nextBase.width, height: nextBase.height, strokes, texts, markers };
       commitStructural(nextBase, nextDoc);
       setSelectedTextId(null);
+      setSelectedMarkerId(null);
     },
     [base, doc, commitStructural],
   );
@@ -614,7 +667,83 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
 
   const clearStrokes = useCallback(() => {
     if (!doc) return;
-    commitDoc(clearStrokesInDoc(doc), false);
+    commitDoc(clearStrokesInDoc(doc, 'brush'), false);
+  }, [doc, commitDoc]);
+
+  const setMosaic = useCallback((patch: Partial<MosaicSettings>) => {
+    setMosaicState((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const clearMosaic = useCallback(() => {
+    if (!doc) return;
+    commitDoc(clearStrokesInDoc(doc, 'mosaic'), false);
+  }, [doc, commitDoc]);
+
+  // ---------------------------------------------------------------------
+  // Step markers
+  // ---------------------------------------------------------------------
+
+  const setMarker = useCallback((patch: Partial<MarkerSettings>) => {
+    setMarkerSettings((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const selectMarker = useCallback((id: string | null) => {
+    setSelectedMarkerId(id);
+    if (id) setSelectedTextId(null);
+  }, []);
+
+  const addMarker = useCallback(
+    (patch?: Partial<Marker>): Marker | null => {
+      if (!doc) return null;
+      const item: Marker = {
+        id: createId('marker'),
+        x: Math.round(doc.width / 2),
+        y: Math.round(doc.height / 2),
+        number: nextMarkerNumber(doc),
+        color: marker.color,
+        size: marker.size,
+        shape: marker.shape,
+        ...patch,
+      };
+      transientRef.current = false;
+      commitDoc(appendMarker(doc, item), false);
+      setSelectedMarkerId(item.id);
+      setSelectedTextId(null);
+      return item;
+    },
+    [doc, marker, commitDoc],
+  );
+
+  const updateMarker = useCallback(
+    (id: string, patch: Partial<Marker>, merge = true) => {
+      if (!doc) return;
+      if (!transientRef.current) beginTransient();
+      commitDoc(updateMarkerInDoc(doc, id, patch), merge);
+    },
+    [doc, beginTransient, commitDoc],
+  );
+
+  const removeMarker = useCallback(
+    (id: string) => {
+      if (!doc) return;
+      transientRef.current = false;
+      commitDoc(removeMarkerInDoc(doc, id), false);
+      setSelectedMarkerId((current) => (current === id ? null : current));
+    },
+    [doc, commitDoc],
+  );
+
+  const clearMarkers = useCallback(() => {
+    if (!doc) return;
+    transientRef.current = false;
+    commitDoc(clearMarkersInDoc(doc), false);
+    setSelectedMarkerId(null);
+  }, [doc, commitDoc]);
+
+  const renumberMarkers = useCallback(() => {
+    if (!doc) return;
+    transientRef.current = false;
+    commitDoc(renumberMarkersInDoc(doc), false);
   }, [doc, commitDoc]);
 
   const selectText = useCallback((id: string | null) => {
@@ -783,6 +912,18 @@ export function useImageStudio(props: ImageStudioProps): StudioApi {
     setBrush,
     addStroke,
     clearStrokes,
+    mosaic,
+    setMosaic,
+    clearMosaic,
+    marker,
+    setMarker,
+    selectedMarkerId,
+    selectMarker,
+    addMarker,
+    updateMarker,
+    removeMarker,
+    clearMarkers,
+    renumberMarkers,
     selectedTextId,
     selectText,
     textStyle,

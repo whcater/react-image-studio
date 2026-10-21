@@ -7,6 +7,8 @@ export type IconName =
   | 'adjust'
   | 'filter'
   | 'brush'
+  | 'mosaic'
+  | 'marker'
   | 'text'
   | 'export'
   | 'undo'
@@ -70,6 +72,21 @@ const PATHS: Record<IconName, JSX.Element> = {
     <>
       <path d="M9.5 14.5 18 6a2.1 2.1 0 0 1 3 3l-8.5 8.5" />
       <path d="M9.5 14.5a3.5 3.5 0 0 1 0 5C8 21 4 21 3 21c.7-1.5.7-5.5 2-6.5a3.5 3.5 0 0 1 4.5 0Z" />
+    </>
+  ),
+  mosaic: (
+    <>
+      <rect x="3" y="3" width="6.5" height="6.5" rx="1.2" />
+      <rect x="14.5" y="3" width="6.5" height="6.5" rx="1.2" />
+      <rect x="8.75" y="8.75" width="6.5" height="6.5" rx="1.2" />
+      <rect x="3" y="14.5" width="6.5" height="6.5" rx="1.2" />
+      <rect x="14.5" y="14.5" width="6.5" height="6.5" rx="1.2" />
+    </>
+  ),
+  marker: (
+    <>
+      <path d="M12 21s6-5.6 6-10.6A6 6 0 0 0 6 10.4C6 15.4 12 21 12 21Z" />
+      <circle cx="12" cy="10.4" r="2.3" />
     </>
   ),
   text: (

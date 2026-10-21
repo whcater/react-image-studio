@@ -1,6 +1,6 @@
 {
   "name": "react-image-studio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A feature-rich, non-destructive image editor component for React (crop, rotate, filters, brush, text, zoom and export).",
   "keywords": [
     "react",

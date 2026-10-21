@@ -135,7 +135,15 @@ export const ImageStudio = forwardRef<ImageStudioHandle, ImageStudioProps>(funct
       }
       if (key === 'escape') {
         if (api.tool === 'crop') api.setTool('move');
-        else api.selectText(null);
+        else {
+          api.selectText(null);
+          api.selectMarker(null);
+        }
+        return;
+      }
+      if ((key === 'delete' || key === 'backspace') && api.selectedMarkerId && api.tool === 'marker') {
+        event.preventDefault();
+        api.removeMarker(api.selectedMarkerId);
         return;
       }
       if (key === 'enter' && api.tool === 'crop') {

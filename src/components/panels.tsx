@@ -3,7 +3,7 @@ import { useStudio } from '../context.js';
 import { ADJUST_DEFINITIONS, FILTER_PRESETS, adjustmentsForPreset } from '../core/filters.js';
 import { CROP_ASPECTS } from '../i18n.js';
 import { renderThumbnail } from '../core/render.js';
-import type { ExportFormat, TextAlign } from '../types.js';
+import type { ExportFormat, MarkerShape, MosaicStyle, TextAlign } from '../types.js';
 import { Button, ColorField, Panel, Segmented, Slider } from './ui.js';
 import { Icon } from './icons.js';
 
@@ -223,6 +223,195 @@ export function BrushPanel() {
           neutral={100}
           onChange={(opacity) => api.setBrush({ opacity })}
         />
+      </div>
+    </Panel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mosaic
+// ---------------------------------------------------------------------------
+
+export function MosaicPanel() {
+  const api = useStudio();
+  const { labels, mosaic, doc } = api;
+  const count = doc ? doc.strokes.filter((stroke) => stroke.kind === 'mosaic').length : 0;
+
+  return (
+    <Panel
+      title={labels.app.mosaicTitle}
+      hint={labels.app.mosaicHint}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="trash"
+          onClick={api.clearMosaic}
+          disabled={count === 0}
+          title={labels.app.mosaicClear}
+          aria-label={labels.app.mosaicClear}
+        />
+      }
+    >
+      <div className="ris-stack">
+        <Segmented<MosaicStyle>
+          ariaLabel={labels.app.mosaicStyle}
+          block
+          size="sm"
+          value={mosaic.style}
+          options={[
+            { value: 'pixelate', label: labels.app.mosaicPixelate },
+            { value: 'blur', label: labels.app.mosaicBlur },
+          ]}
+          onChange={(style) => api.setMosaic({ style })}
+        />
+        <Slider
+          label={labels.app.mosaicBrushSize}
+          value={mosaic.size}
+          min={8}
+          max={400}
+          unit="px"
+          onChange={(size) => api.setMosaic({ size })}
+        />
+        {mosaic.style === 'pixelate' ? (
+          <Slider
+            label={labels.app.mosaicBlock}
+            value={mosaic.block}
+            min={4}
+            max={64}
+            unit="px"
+            neutral={14}
+            onChange={(block) => api.setMosaic({ block })}
+          />
+        ) : (
+          <Slider
+            label={labels.app.mosaicStrength}
+            value={mosaic.blur}
+            min={2}
+            max={40}
+            unit="px"
+            neutral={10}
+            onChange={(blur) => api.setMosaic({ blur })}
+          />
+        )}
+        <p className="ris-muted ris-small">
+          {count} {count === 1 ? 'stroke' : 'strokes'}
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step markers
+// ---------------------------------------------------------------------------
+
+export function MarkerPanel() {
+  const api = useStudio();
+  const { labels, doc, marker } = api;
+  const selected = doc?.markers.find((item) => item.id === api.selectedMarkerId) ?? null;
+
+  if (!doc) return null;
+
+  const applyTo = (patch: { color?: string; size?: number; shape?: MarkerShape }) => {
+    api.setMarker(patch);
+    if (selected) api.updateMarker(selected.id, patch, false);
+  };
+
+  return (
+    <Panel
+      title={labels.app.markerTitle}
+      hint={labels.app.markerHint}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          icon="plus"
+          onClick={() => api.addMarker()}
+          title={labels.app.markerAdd}
+          aria-label={labels.app.markerAdd}
+        />
+      }
+    >
+      <div className="ris-stack">
+        <Segmented<MarkerShape>
+          ariaLabel={labels.app.markerShape}
+          block
+          size="sm"
+          value={selected?.shape ?? marker.shape}
+          options={[
+            { value: 'circle', label: labels.app.markerCircle },
+            { value: 'square', label: labels.app.markerSquare },
+            { value: 'ring', label: labels.app.markerRing },
+          ]}
+          onChange={(shape) => applyTo({ shape })}
+        />
+
+        <ColorField
+          label={labels.app.markerColor}
+          value={selected?.color ?? marker.color}
+          onChange={(color) => applyTo({ color })}
+          swatches={['#ef4444', '#f97316', '#facc15', '#22c55e', '#0ea5e9', '#6366f1', '#ec4899', '#111827', '#ffffff']}
+        />
+
+        <Slider
+          label={labels.app.markerSize}
+          value={selected?.size ?? marker.size}
+          min={24}
+          max={600}
+          unit="px"
+          neutral={120}
+          onBegin={api.beginTransient}
+          onChange={(size) => {
+            if (selected) api.updateMarker(selected.id, { size });
+            else api.setMarker({ size });
+          }}
+          onCommit={api.endTransient}
+        />
+
+        {doc.markers.length > 0 ? (
+          <ul className="ris-list">
+            {doc.markers.map((item) => (
+              <li key={item.id} className="ris-list__item">
+                <button
+                  type="button"
+                  className={`ris-list__select${item.id === api.selectedMarkerId ? ' is-active' : ''}`}
+                  onClick={() => api.selectMarker(item.id)}
+                >
+                  <span className="ris-marker-dot" style={{ background: item.color }}>
+                    {item.number}
+                  </span>
+                  <span className="ris-list__label">
+                    {Math.round(item.x)}, {Math.round(item.y)}
+                  </span>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="trash"
+                  aria-label={labels.app.markerDelete}
+                  title={labels.app.markerDelete}
+                  onClick={() => api.removeMarker(item.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="ris-grid-2">
+          <Button
+            variant="soft"
+            size="sm"
+            icon="reset"
+            onClick={api.renumberMarkers}
+            disabled={doc.markers.length < 2}
+          >
+            {labels.app.markerRenumber}
+          </Button>
+          <Button variant="outline" size="sm" icon="trash" onClick={api.clearMarkers} disabled={doc.markers.length === 0}>
+            {labels.app.markerClear}
+          </Button>
+        </div>
       </div>
     </Panel>
   );
@@ -526,8 +715,12 @@ export function ToolPanel() {
       return <FilterPanel />;
     case 'brush':
       return <BrushPanel />;
+    case 'mosaic':
+      return <MosaicPanel />;
     case 'text':
       return <TextPanel />;
+    case 'marker':
+      return <MarkerPanel />;
     case 'export':
       return <ExportPanel />;
     default:

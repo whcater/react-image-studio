@@ -1,5 +1,12 @@
 export { ImageStudio } from './ImageStudio.js';
-export { useImageStudio, ALL_TOOLS, DEFAULT_BRUSH, DEFAULT_TEXT_STYLE } from './hooks/useImageStudio.js';
+export {
+  useImageStudio,
+  ALL_TOOLS,
+  DEFAULT_BRUSH,
+  DEFAULT_MARKER,
+  DEFAULT_MOSAIC,
+  DEFAULT_TEXT_STYLE,
+} from './hooks/useImageStudio.js';
 export type { StudioApi, EditorStatus } from './hooks/useImageStudio.js';
 
 export type {
@@ -14,11 +21,17 @@ export type {
   ImageStudioHandle,
   ImageStudioProps,
   Labels,
+  Marker,
+  MarkerSettings,
+  MarkerShape,
+  MosaicSettings,
+  MosaicStyle,
   Point,
   Rect,
   SaveResult,
   Size,
   Stroke,
+  StrokeKind,
   TextAlign,
   TextItem,
   ToolId,
@@ -50,6 +63,6 @@ export { createHistory, commit, canUndo, canRedo, undo, redo, HISTORY_LIMIT } fr
 export type { HistoryState, HistorySlot } from './core/history.js';
 export { initialDoc, cloneDoc, normalizeDoc } from './core/doc.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 export { ImageStudio as default } from './ImageStudio.js';

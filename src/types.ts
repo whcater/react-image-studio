@@ -8,7 +8,9 @@ export type ToolId =
   | 'adjust'
   | 'filter'
   | 'brush'
+  | 'mosaic'
   | 'text'
+  | 'marker'
   | 'export';
 
 /** Output formats supported by the exporter. */
@@ -79,6 +81,12 @@ export interface BrushSettings {
   erase: boolean;
 }
 
+/** How a freehand stroke affects the image. */
+export type StrokeKind = 'brush' | 'mosaic';
+
+/** Redaction style of a mosaic stroke. */
+export type MosaicStyle = 'pixelate' | 'blur';
+
 /** A single freehand stroke, stored as a compact point list. */
 export interface Stroke {
   id: string;
@@ -87,6 +95,48 @@ export interface Stroke {
   size: number;
   opacity: number;
   erase: boolean;
+  /** Defaults to `'brush'`; `'mosaic'` strokes redact instead of painting. */
+  kind?: StrokeKind;
+  /** Pixelate block size in image pixels (mosaic strokes only). */
+  mosaicBlock?: number;
+  /** `'pixelate'` (blocky) or `'blur'` (soft) redaction. */
+  mosaicStyle?: MosaicStyle;
+  /** Redaction strength for `'blur'`, in image pixels. */
+  mosaicBlur?: number;
+}
+
+/** Visual style of a numbered step marker. */
+export type MarkerShape = 'circle' | 'square' | 'ring';
+
+export interface MarkerSettings {
+  color: string;
+  /** Diameter in image pixels. */
+  size: number;
+  shape: MarkerShape;
+}
+
+/** A numbered annotation used for step-by-step screenshots. */
+export interface Marker {
+  id: string;
+  /** Centre position in image pixels. */
+  x: number;
+  y: number;
+  /** 1-based badge number. */
+  number: number;
+  color: string;
+  /** Diameter in image pixels. */
+  size: number;
+  shape: MarkerShape;
+}
+
+export interface MosaicSettings {
+  /** Brush diameter in image pixels. */
+  size: number;
+  style: MosaicStyle;
+  /** Block size for `'pixelate'`, in image pixels. */
+  block: number;
+  /** Radius for `'blur'`, in image pixels. */
+  blur: number;
 }
 
 export type TextAlign = 'left' | 'center' | 'right';
@@ -118,6 +168,8 @@ export interface EditorDoc {
   adjust: Adjustments;
   strokes: Stroke[];
   texts: TextItem[];
+  /** Numbered step markers, drawn on top of everything else. */
+  markers: Marker[];
   /** Id of the applied filter preset, or `null` for a custom look. */
   preset: string | null;
   rotation: number;
@@ -184,6 +236,15 @@ export interface Labels {
     brushColor: string;
     brushEraser: string;
     brushClear: string;
+    mosaicTitle: string;
+    mosaicStyle: string;
+    mosaicPixelate: string;
+    mosaicBlur: string;
+    mosaicBrushSize: string;
+    mosaicBlock: string;
+    mosaicStrength: string;
+    mosaicClear: string;
+    mosaicHint: string;
     textTitle: string;
     textPlaceholder: string;
     addText: string;
@@ -195,6 +256,18 @@ export interface Labels {
     textAlign: string;
     textRotation: string;
     deleteText: string;
+    markerTitle: string;
+    markerHint: string;
+    markerShape: string;
+    markerCircle: string;
+    markerSquare: string;
+    markerRing: string;
+    markerSize: string;
+    markerColor: string;
+    markerAdd: string;
+    markerDelete: string;
+    markerRenumber: string;
+    markerClear: string;
     exportTitle: string;
     format: string;
     quality: string;
