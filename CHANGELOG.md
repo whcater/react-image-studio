@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] — 2026-10-22
+
+### Added
+- **Live demo site** on GitHub Pages (<https://whcater.github.io/react-image-studio/>):
+  a zero-build page with the real component, a feature tour, usage snippets and the full
+  props / ref / hook reference. Served from `docs/` and produced by `npm run build:site`.
+- README now links to the demo and documents the mosaic and step-marker tools.
+
+### Changed
+- No API changes; this is a packaging/docs release on top of 1.1.0.
+
 ## [1.1.0] — 2026-10-21
 
 ### Added

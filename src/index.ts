@@ -63,6 +63,6 @@ export { createHistory, commit, canUndo, canRedo, undo, redo, HISTORY_LIMIT } fr
 export type { HistoryState, HistorySlot } from './core/history.js';
 export { initialDoc, cloneDoc, normalizeDoc } from './core/doc.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.1.1';
 
 export { ImageStudio as default } from './ImageStudio.js';
