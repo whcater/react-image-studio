@@ -1,0 +1,159 @@
+#!/usr/bin/env node
+/**
+ * Build the GitHub Pages site in docs/.
+ *
+ * The demo has to run from a static host with no bundler, so the library's
+ * multi-file ESM output is flattened into a single module that only imports
+ * `react` / `react/jsx-runtime` (mapped to a CDN by the page's import map):
+ *
+ *   dist/esm/**  ──flatten──▶  docs/lib/image-studio.js
+ *   dist/style.css ──copy──▶   docs/lib/style.css
+ */
+import { readFile, readdir, mkdir, writeFile, copyFile, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const esmDir = path.join(root, 'dist/esm');
+const outDir = path.join(root, 'docs/lib');
+const EXTERNALS = new Set(['react', 'react/jsx-runtime']);
+
+const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+
+async function collect(dir, prefix = '', out = new Map()) {
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const key = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) await collect(full, key, out);
+    else if (entry.name.endsWith('.js')) out.set(key, await readFile(full, 'utf8'));
+  }
+  return out;
+}
+
+const modules = await collect(esmDir);
+if (modules.size === 0) {
+  console.error('[site] dist/esm is empty — run `npm run build` first');
+  process.exit(1);
+}
+
+const deps = new Map();
+const externals = new Set();
+const resolveKey = (from, spec) => path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
+const refOf = (from, spec) => {
+  if (EXTERNALS.has(spec)) return `__ext[${JSON.stringify(spec)}]`;
+  const key = resolveKey(from, spec);
+  if (!modules.has(key)) throw new Error(`unresolved import ${spec} from ${from}`);
+  if (!deps.has(from)) deps.set(from, new Set());
+  deps.get(from).add(key);
+  return `__m[${JSON.stringify(key)}]`;
+};
+
+const destructure = (clause) =>
+  `{ ${clause
+    .trim()
+    .replace(/^\{/, '')
+    .replace(/\}$/, '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [name, alias] = part.split(/\s+as\s+/);
+      return alias ? `${name.trim()}: ${alias.trim()}` : name.trim();
+    })
+    .join(', ')} }`;
+
+function transform(key, source) {
+  const names = [];
+  const reexports = [];
+  let body = source;
+
+  body = body.replace(/^import\s+([\s\S]*?)\s+from\s+(['"])([^'"]+)\2;?[ \t]*$/gm, (match, clause, quote, spec) => {
+    const ref = refOf(key, spec);
+    const trimmed = clause.trim();
+    if (/^\*\s+as\s+/.test(trimmed)) return `const ${trimmed.replace(/^\*\s+as\s+/, '')} = ${ref};`;
+    if (trimmed.startsWith('{')) return `const ${destructure(trimmed)} = ${ref};`;
+    const commaAt = trimmed.indexOf(',');
+    if (commaAt === -1) return `const ${trimmed} = ${ref}.default;`;
+    return `const ${trimmed.slice(0, commaAt).trim()} = ${ref}.default;\nconst ${destructure(trimmed.slice(commaAt + 1))} = ${ref};`;
+  });
+  body = body.replace(/^import\s+(['"])([^'"]+)\1;?[ \t]*$/gm, '');
+
+  body = body.replace(/^export\s*\{([\s\S]*?)\}\s*from\s*(['"])([^'"]+)\2;?[ \t]*$/gm, (match, clause, quote, spec) => {
+    const ref = refOf(key, spec);
+    for (const part of clause.trim().split(',').map((p) => p.trim()).filter(Boolean)) {
+      const [name, alias] = part.split(/\s+as\s+/);
+      reexports.push(`__e[${JSON.stringify((alias ?? name).trim())}] = ${ref}.${name.trim()};`);
+    }
+    return '';
+  });
+
+  body = body.replace(/^export\s*\{([\s\S]*?)\};?[ \t]*$/gm, (match, clause) => {
+    for (const part of clause.trim().split(',').map((p) => p.trim()).filter(Boolean)) {
+      const [name, alias] = part.split(/\s+as\s+/);
+      if (alias) reexports.push(`__e[${JSON.stringify(alias.trim())}] = ${name.trim()};`);
+      else names.push(name.trim());
+    }
+    return '';
+  });
+
+  body = body.replace(/^export\s+(async\s+function|function|const|let|var|class)\s+([A-Za-z0-9_$]+)/gm, (match, kind, name) => {
+    names.push(name);
+    return `${kind} ${name}`;
+  });
+
+  const assignments = [...names.map((n) => `__e[${JSON.stringify(n)}] = ${n};`), ...reexports];
+  return { body: body.trimEnd(), assignments };
+}
+
+const transformed = new Map();
+for (const [key, source] of modules) transformed.set(key, transform(key, source));
+
+const ordered = [];
+const visiting = new Set();
+const done = new Set();
+const visit = (key) => {
+  if (done.has(key)) return;
+  if (visiting.has(key)) throw new Error(`import cycle through ${key}`);
+  visiting.add(key);
+  for (const dep of deps.get(key) ?? []) visit(dep);
+  visiting.delete(key);
+  done.add(key);
+  ordered.push(key);
+};
+for (const key of modules.keys()) visit(key);
+
+const chunks = [];
+chunks.push(`/**`);
+chunks.push(` * react-image-studio ${pkg.version} — flattened ESM build for the docs site.`);
+chunks.push(` * Generated by scripts/build-site.mjs from dist/esm; do not edit by hand.`);
+chunks.push(` */`);
+chunks.push(`import * as __react from 'react';`);
+chunks.push(`import * as __jsxRuntime from 'react/jsx-runtime';`);
+chunks.push(`const __ext = { react: __react, 'react/jsx-runtime': __jsxRuntime };`);
+chunks.push(`const __m = Object.create(null);`);
+chunks.push(`const __def = (id, fn) => { const __e = {}; __m[id] = __e; fn(__e); };`);
+for (const key of ordered) {
+  const { body, assignments } = transformed.get(key);
+  chunks.push(`__def(${JSON.stringify(key)}, (__e) => {`);
+  chunks.push(body);
+  if (assignments.length) chunks.push(assignments.join('\n'));
+  chunks.push(`});`);
+}
+chunks.push(`const __index = __m['index.js'];`);
+const exported = ['ImageStudio', 'useImageStudio', 'FILTER_PRESETS', 'ADJUST_DEFINITIONS', 'DEFAULT_MARKER', 'DEFAULT_MOSAIC', 'DEFAULT_BRUSH', 'ALL_TOOLS', 'VERSION', 'buildFilterString', 'renderDoc', 'EN_LABELS', 'ZH_CN_LABELS'];
+const missing = exported.filter((name) => !modules.has('index.js') || !String(modules.get('index.js')).includes(name));
+chunks.push(`export const {`);
+chunks.push(`  ${exported.join(',\n  ')},`);
+chunks.push(`} = __index;`);
+chunks.push(`export default __index.ImageStudio;`);
+if (missing.length) console.warn(`[site] warning: index.js may not export ${missing.join(', ')}`);
+
+await rm(outDir, { recursive: true, force: true });
+await mkdir(outDir, { recursive: true });
+const bundlePath = path.join(outDir, 'image-studio.js');
+await writeFile(bundlePath, `${chunks.join('\n')}\n`);
+await copyFile(path.join(root, 'dist/style.css'), path.join(outDir, 'style.css'));
+
+const size = (await readFile(bundlePath)).byteLength;
+console.log(`[site] docs/lib/image-studio.js — ${ordered.length} modules, ${(size / 1024).toFixed(1)} kB`);
+console.log(`[site] docs/lib/style.css copied`);

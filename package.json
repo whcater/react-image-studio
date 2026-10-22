@@ -54,9 +54,10 @@
   "scripts": {
     "clean": "node ./scripts/clean.mjs",
     "build": "node ./scripts/build.mjs",
-    "typecheck": "tsc -p tsconfig.check.json --noEmit",
+    "build:site": "node ./scripts/build-site.mjs",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
     "test": "node ./scripts/test.mjs",
-    "prepublishOnly": "npm run clean && npm run build && npm test"
+    "typecheck": "tsc -p tsconfig.check.json --noEmit"
   },
   "peerDependencies": {
     "react": ">=17",

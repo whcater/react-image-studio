@@ -14,6 +14,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and this proj
   "Renumber from top-left" to re-sort badges into reading order.
 - `Marker`, `MarkerSettings`, `MarkerShape`, `MosaicSettings`, `MosaicStyle` and `StrokeKind`
   are exported, together with `DEFAULT_MARKER` and `DEFAULT_MOSAIC`.
+- **Docs site** (`docs/`): a zero-build GitHub Pages page with a live demo, feature tour, usage
+  snippets and the full props/ref/hook reference. Built by `npm run build:site`, which flattens
+  `dist/esm` into one module for static hosting.
 - `EditorDoc.markers` is part of the serialisable document; `Stroke` gained an optional
   `kind` (`brush` | `mosaic`) plus `mosaicStyle`, `mosaicBlock` and `mosaicBlur`.
 

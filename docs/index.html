@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>react-image-studio · non-destructive image editor for React</title>
+    <meta
+      name="description"
+      content="A feature-rich, non-destructive image editor component for React: crop, rotate, filters, mosaic redaction, numbered step markers, brush, text, zoom and PNG/JPEG/WebP export."
+    />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234c8dff' stroke-width='2' stroke-linecap='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2'/%3E%3Ccircle cx='8.5' cy='9.5' r='1.5'/%3E%3Cpath d='M21 16l-5-5-6 6-3-3-4 4'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./lib/style.css" />
+    <link rel="stylesheet" href="./site.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.3.1",
+          "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+          "react-dom": "https://esm.sh/react-dom@18.3.1",
+          "react-dom/client": "https://esm.sh/react-dom@18.3.1/client"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header class="nav">
+      <a class="nav__brand" href="#top">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="8.5" cy="9.5" r="1.5" />
+          <path d="M21 16l-5-5-6 6-3-3-4 4" />
+        </svg>
+        <span>react-image-studio</span>
+      </a>
+      <nav class="nav__links">
+        <a href="#demo">Demo</a>
+        <a href="#features">Features</a>
+        <a href="#usage">Usage</a>
+        <a href="#api">API</a>
+        <a href="#theming">Theming</a>
+        <a class="nav__pill" href="https://www.npmjs.com/package/react-image-studio" target="_blank" rel="noreferrer">npm</a>
+        <a class="nav__pill" href="https://github.com/whcater/react-image-studio" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <!-- ───────────────────────────── hero ───────────────────────────── -->
+      <section class="hero">
+        <div class="hero__text">
+          <div class="badges">
+            <a href="https://www.npmjs.com/package/react-image-studio" target="_blank" rel="noreferrer"
+              ><img alt="npm version" src="https://img.shields.io/npm/v/react-image-studio.svg?logo=npm&logoColor=white"
+            /></a>
+            <a href="https://github.com/whcater/react-image-studio/blob/main/LICENSE" target="_blank" rel="noreferrer"
+              ><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg"
+            /></a>
+            <a href="https://github.com/whcater/react-image-studio/actions/workflows/ci.yml" target="_blank" rel="noreferrer"
+              ><img alt="CI" src="https://github.com/whcater/react-image-studio/actions/workflows/ci.yml/badge.svg"
+            /></a>
+            <img alt="provenance" src="https://img.shields.io/badge/provenance-sigstore%20verified-success" />
+          </div>
+          <h1>A non-destructive image editor<br />that drops into React</h1>
+          <p class="hero__lead">
+            Crop, rotate, colour-grade, <strong>redact with mosaic</strong>, and annotate screenshots with
+            <strong>numbered step markers</strong> — then export PNG, JPEG or WebP. Zero runtime dependencies,
+            TypeScript-first, ESM + CJS, keyboard accessible and fully translatable.
+          </p>
+          <div class="hero__cta">
+            <a class="btn btn--primary" href="#demo">Try the live demo</a>
+            <a class="btn" href="#usage">Quick start</a>
+          </div>
+        </div>
+        <div class="hero__code">
+          <div class="code__head"><span>install</span><button type="button" data-copy="#install-code">copy</button></div>
+          <pre id="install-code"><code>npm install react-image-studio</code></pre>
+          <div class="code__head"><span>use</span><button type="button" data-copy="#usage-code">copy</button></div>
+          <pre id="usage-code"><code>import { ImageStudio } from 'react-image-studio';
+import 'react-image-studio/style.css';
+
+export default function App() {
+  return (
+    &lt;div style={{ height: '80vh' }}&gt;
+      &lt;ImageStudio src="/photo.jpg" /&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────── demo ───────────────────────────── -->
+      <section id="demo" class="section">
+        <div class="section__head">
+          <h2>Live demo</h2>
+          <p>
+            Everything below runs the real component from <code>docs/lib/image-studio.js</code> — the same build that
+            ships to npm. Draw a mosaic over the sun, then drop <code>1 · 2 · 3</code> markers to caption the steps.
+          </p>
+        </div>
+
+        <div class="demo">
+          <div class="demo__bar">
+            <button type="button" class="chip" id="demo-sample">Sample image</button>
+            <label class="chip chip--file">
+              Upload
+              <input type="file" id="demo-upload" accept="image/*" />
+            </label>
+            <span class="demo__sep"></span>
+            <button type="button" class="chip" id="demo-locale" data-value="en">EN</button>
+            <button type="button" class="chip" id="demo-theme" data-value="light">Theme: light</button>
+            <select class="chip" id="demo-format" aria-label="Export format">
+              <option value="png">PNG</option>
+              <option value="webp" selected>WebP</option>
+              <option value="jpeg">JPEG</option>
+            </select>
+            <span class="demo__sep"></span>
+            <span class="demo__log" id="demo-log">Ready — try crop, filters, mosaic and markers.</span>
+          </div>
+          <div class="demo__stage" id="demo-root">
+            <div class="demo__loading">Loading the editor…</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── features ─────────────────────────── -->
+      <section id="features" class="section">
+        <div class="section__head">
+          <h2>What is inside</h2>
+          <p>Eleven tools, one component, no runtime dependencies.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Crop</h3>
+            <p>Eight drag handles, rule-of-thirds guides, drag-to-create inside the frame and aspect presets (1:1, 4:3, 3:2, 16:9, 3:4, 9:16). Crops stay pixel-aligned, so nothing is resampled.</p>
+          </article>
+          <article class="card">
+            <h3>Rotate &amp; flip</h3>
+            <p>Quarter turns and mirroring. Brush strokes, mosaic strokes, text and markers are remapped into the new coordinate space instead of drifting.</p>
+          </article>
+          <article class="card">
+            <h3>Adjust</h3>
+            <p>Brightness, contrast, saturation, warmth, hue, blur, grayscale, sepia, invert and opacity. Sliders are real <code>&lt;input type="range"&gt;</code> elements — double-click a value to reset it.</p>
+          </article>
+          <article class="card">
+            <h3>Filters</h3>
+            <p>Twelve presets (Vivid, Warm, Cool, Mono, Noir, Sepia, Vintage, Dramatic, Fade, Sunset, Matrix…) rendered as live thumbnails of <em>your</em> image.</p>
+          </article>
+          <article class="card">
+            <h3>Brush</h3>
+            <p>Freehand painting with colour, size and opacity — plus an eraser that only removes paint, never the photo underneath.</p>
+          </article>
+          <article class="card card--new">
+            <span class="card__flag">new in 1.1</span>
+            <h3>Mosaic redaction</h3>
+            <p>A dedicated mosaic tool: paint areas you need to hide. Choose <strong>pixelate</strong> (with block size) or <strong>blur</strong> (with strength), then adjust the brush diameter. Strokes are stored, not baked.</p>
+          </article>
+          <article class="card card--new">
+            <span class="card__flag">new in 1.1</span>
+            <h3>Step markers</h3>
+            <p>Click to drop numbered badges <code>1 · 2 · 3 …</code> for step-by-step screenshots. Circle, square or ring shapes, custom colour and size, drag to reposition, auto-renumbering when you delete one.</p>
+          </article>
+          <article class="card">
+            <h3>Text layers</h3>
+            <p>Multiple text items with font family, size, weight, italic, colour, alignment, rotation and opacity. Drag on the canvas, double-click to edit.</p>
+          </article>
+          <article class="card">
+            <h3>Undo that respects intent</h3>
+            <p>Sixty steps of history where a whole slider drag, a text edit session or a stroke is one undo step — not one per pointer event.</p>
+          </article>
+          <article class="card">
+            <h3>Zoom &amp; pan</h3>
+            <p>Wheel and pinch zoom anchored at the pointer, drag to pan, fit-to-screen, actual size, and clamped bounds so the image cannot be lost off-screen.</p>
+          </article>
+          <article class="card">
+            <h3>Export</h3>
+            <p>PNG with transparency, JPEG flattened onto white (no black backgrounds), WebP with a quality slider, custom filenames, plus copy-to-clipboard.</p>
+          </article>
+          <article class="card">
+            <h3>Theming, i18n, a11y</h3>
+            <p>Light / dark / auto themes through CSS custom properties, English and <code>zh-CN</code> strings with full overrides, ARIA roles, visible focus rings and <code>prefers-reduced-motion</code> support.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ──────────────────────────── usage ──────────────────────────── -->
+      <section id="usage" class="section">
+        <div class="section__head">
+          <h2>Usage</h2>
+          <p>Four ways in, from “just render it” to “drive it yourself”.</p>
+        </div>
+
+        <div class="usage">
+          <div class="usage__item">
+            <h3>Basic</h3>
+            <pre><code>import { ImageStudio } from 'react-image-studio';
+import 'react-image-studio/style.css';
+
+&lt;ImageStudio src={fileOrUrl} /&gt;</code></pre>
+            <p class="muted">
+              No global CSS import? Use the auto-injecting entry instead:
+              <code>import 'react-image-studio/auto-style';</code>
+            </p>
+          </div>
+
+          <div class="usage__item">
+            <h3>Configured</h3>
+            <pre><code>&lt;ImageStudio
+  src={file}
+  theme="dark"                    // 'light' | 'dark' | 'auto'
+  labels="zh-CN"                  // or Partial&lt;Labels&gt;
+  tools={['crop', 'mosaic', 'marker', 'export']}
+  defaultTool="marker"
+  defaultFormat="webp"
+  onSave={(result) =&gt; upload(result.blob)}
+  onDocChange={(doc) =&gt; setDraft(doc)}
+  onError={(error) =&gt; toast.error(error.message)}
+/&gt;</code></pre>
+          </div>
+
+          <div class="usage__item">
+            <h3>Imperative handle</h3>
+            <pre><code>const editor = useRef&lt;ImageStudioHandle&gt;(null);
+&lt;ImageStudio ref={editor} /&gt;
+
+await editor.current.load(newFile);
+const blob = await editor.current.export('png');
+editor.current.rotate(1);
+editor.current.crop({ x: 10, y: 10, width: 800, height: 600 });
+const snapshot = editor.current.getDoc();</code></pre>
+          </div>
+
+          <div class="usage__item">
+            <h3>Custom chrome</h3>
+            <pre><code>import { useImageStudio, buildFilterString } from 'react-image-studio';
+
+const api = useImageStudio({ src });
+api.setTool('marker');
+api.addMarker({ x: 200, y: 140 });      // numbered automatically
+api.setMosaic({ style: 'blur', blur: 14 });
+api.renumberMarkers();
+await api.download('webp', 0.85);</code></pre>
+            <p class="muted">The hook exposes the exact same state the built-in UI uses.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────── api ───────────────────────────── -->
+      <section id="api" class="section">
+        <div class="section__head">
+          <h2>API</h2>
+          <p>Props, the imperative handle, and the hook faces added in 1.1.</p>
+        </div>
+
+        <h3 class="subhead">Props</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Prop</th><th>Type</th><th>Default</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>src</code></td><td><code>string | Blob | File | null</code></td><td>–</td><td>Image to load (URL, data URL, blob or file).</td></tr>
+              <tr><td><code>image</code></td><td><code>CanvasImageSource</code></td><td>–</td><td>Alternative entry point for an already decoded image.</td></tr>
+              <tr><td><code>doc</code></td><td><code>EditorDoc</code></td><td>–</td><td>Restore a previously saved document.</td></tr>
+              <tr><td><code>onDocChange</code></td><td><code>(doc) =&gt; void</code></td><td>–</td><td>Fired on every committed change.</td></tr>
+              <tr><td><code>onSave</code></td><td><code>(result) =&gt; void</code></td><td>–</td><td>Fired after a successful export.</td></tr>
+              <tr><td><code>onError</code></td><td><code>(error) =&gt; void</code></td><td>–</td><td>Load / export failures.</td></tr>
+              <tr><td><code>tools</code></td><td><code>ToolId[]</code></td><td>all</td><td><code>move · crop · rotate · adjust · filter · brush · mosaic · text · marker · export</code></td></tr>
+              <tr><td><code>defaultTool</code></td><td><code>ToolId</code></td><td><code>'move'</code></td><td>Tool selected on mount.</td></tr>
+              <tr><td><code>theme</code></td><td><code>'light' | 'dark' | 'auto'</code></td><td><code>'auto'</code></td><td>Chrome colour scheme.</td></tr>
+              <tr><td><code>labels</code></td><td><code>'zh-CN' | Partial&lt;Labels&gt;</code></td><td>English</td><td>UI strings.</td></tr>
+              <tr><td><code>className</code> / <code>style</code></td><td>–</td><td>–</td><td>Applied to the root element.</td></tr>
+              <tr><td><code>defaultFormat</code></td><td><code>'png' | 'jpeg' | 'webp'</code></td><td><code>'png'</code></td><td>Initial export format.</td></tr>
+              <tr><td><code>maxSourceSize</code></td><td><code>number</code></td><td><code>0</code></td><td>Longest edge used when decoding (<code>0</code> = keep original).</td></tr>
+              <tr><td><code>allowDrop</code></td><td><code>boolean</code></td><td><code>true</code></td><td>Enable drag &amp; drop loading.</td></tr>
+              <tr><td><code>disableShortcuts</code></td><td><code>boolean</code></td><td><code>false</code></td><td>Turn off keyboard shortcuts.</td></tr>
+              <tr><td><code>emptyState</code></td><td><code>ReactNode</code></td><td>–</td><td>Custom empty state.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="subhead">Ref handle</h3>
+        <p class="muted">
+          <code>load</code> · <code>export</code> · <code>download</code> · <code>getDoc</code> · <code>setDoc</code> ·
+          <code>undo</code> · <code>redo</code> · <code>reset</code> · <code>rotate</code> · <code>flip</code> ·
+          <code>crop</code> · <code>setTool</code> · <code>fit</code> · <code>setZoom</code> · <code>canUndo</code> ·
+          <code>canRedo</code>
+        </p>
+
+        <h3 class="subhead">Hook faces added in 1.1</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Face</th><th>Signature</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>mosaic</code></td><td><code>MosaicSettings</code></td><td><code>{ size, style: 'pixelate' | 'blur', block, blur }</code></td></tr>
+              <tr><td><code>setMosaic</code></td><td><code>(patch: Partial&lt;MosaicSettings&gt;) =&gt; void</code></td><td>Update brush diameter, style, block size or blur strength.</td></tr>
+              <tr><td><code>clearMosaic</code></td><td><code>() =&gt; void</code></td><td>Remove every mosaic stroke (brush paint is kept).</td></tr>
+              <tr><td><code>marker</code></td><td><code>MarkerSettings</code></td><td><code>{ color, size, shape: 'circle' | 'square' | 'ring' }</code></td></tr>
+              <tr><td><code>setMarker</code></td><td><code>(patch: Partial&lt;MarkerSettings&gt;) =&gt; void</code></td><td>Defaults for the next marker.</td></tr>
+              <tr><td><code>addMarker</code></td><td><code>(patch?: Partial&lt;Marker&gt;) =&gt; Marker | null</code></td><td>Drop a marker; the number is assigned for you.</td></tr>
+              <tr><td><code>updateMarker</code></td><td><code>(id, patch, merge?) =&gt; void</code></td><td>Move or restyle one marker.</td></tr>
+              <tr><td><code>removeMarker</code></td><td><code>(id: string) =&gt; void</code></td><td>Delete a marker.</td></tr>
+              <tr><td><code>renumberMarkers</code></td><td><code>() =&gt; void</code></td><td>Re-sequence the badges as <code>1..n</code>.</td></tr>
+              <tr><td><code>clearMarkers</code></td><td><code>() =&gt; void</code></td><td>Remove all markers.</td></tr>
+              <tr><td><code>selectedMarkerId</code> / <code>selectMarker</code></td><td><code>string | null</code> / <code>(id) =&gt; void</code></td><td>Selection state for custom panels.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── theming ─────────────────────────── -->
+      <section id="theming" class="section two-col">
+        <div>
+          <h2>Theming</h2>
+          <p>Every colour is a CSS custom property, so the whole chrome can be re-skinned from the outside. <code>.ris-theme-dark</code> flips the palette; <code>prefers-color-scheme</code> drives the <code>auto</code> mode.</p>
+          <pre><code>.my-brand .ris-root {
+  --ris-accent: #e11d48;
+  --ris-radius: 16px;
+  --ris-font: 'Inter', sans-serif;
+}</code></pre>
+          <p class="muted">
+            Tokens: <code>--ris-bg</code> <code>--ris-surface</code> <code>--ris-surface-2</code>
+            <code>--ris-surface-3</code> <code>--ris-border</code> <code>--ris-text</code> <code>--ris-muted</code>
+            <code>--ris-accent</code> <code>--ris-accent-hover</code> <code>--ris-accent-contrast</code>
+            <code>--ris-danger</code> <code>--ris-radius</code> <code>--ris-shadow</code> <code>--ris-font</code>
+          </p>
+        </div>
+        <div>
+          <h2>Localisation</h2>
+          <p>Pass <code>'zh-CN'</code> for the bundled translation, or override any string:</p>
+          <pre><code>&lt;ImageStudio labels={{
+  app: { ...EN_LABELS.app, download: 'Export image' },
+  presets: { ...EN_LABELS.presets, vivid: 'Punchy' },
+}} /&gt;</code></pre>
+          <p class="muted">Mosaic and marker tool labels are part of the same <code>Labels</code> object.</p>
+        </div>
+      </section>
+
+      <!-- ────────────────────────── architecture ────────────────────────── -->
+      <section class="section">
+        <div class="section__head">
+          <h2>How it stays fast</h2>
+          <p>
+            The preview layer is rendered once per structural change; colour adjustments are applied as a CSS filter while
+            blitting, so dragging a slider never re-renders the bitmap. Export always re-renders at full resolution, which
+            is why every tool is non-destructive.
+          </p>
+        </div>
+        <pre class="arch"><code>src/
+  core/            framework-free engine (no React imports)
+    geometry.ts      crop maths, hit testing, view transform
+    filters.ts       adjustments, CSS filter string, presets
+    render.ts        layer compositing (base → mosaic → paint → text → markers)
+    transform.ts     rotate / flip / crop pixel ops
+    history.ts       undo stack
+    image.ts         loading, encoding, download helpers
+  hooks/           useImageStudio — all editor state
+  components/      canvas stage, toolbar, panels
+  ImageStudio.tsx</code></pre>
+        <p class="muted">
+          Browser support: Chrome/Edge 88+, Firefox 90+, Safari 15.4+. Canvas <code>ctx.filter</code> is used for
+          adjustments, with a per-pixel fallback where it is missing. Remote images load with
+          <code>crossOrigin="anonymous"</code> so exports stay untainted.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>MIT © whcater</span>
+      <span class="footer__links">
+        <a href="https://github.com/whcater/react-image-studio" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://www.npmjs.com/package/react-image-studio" target="_blank" rel="noreferrer">npm</a>
+        <a href="https://github.com/whcater/react-image-studio/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a>
+      </span>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

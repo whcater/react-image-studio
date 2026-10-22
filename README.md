@@ -6,7 +6,9 @@
 [![CI](https://github.com/whcater/react-image-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/whcater/react-image-studio/actions/workflows/ci.yml)
 [![provenance](https://img.shields.io/badge/provenance-sigstore%20verified-success)](https://www.npmjs.com/package/react-image-studio)
 
-> A feature-rich, **non-destructive** image editor component for React — crop, rotate, flip, colour filters, freehand brush, text layers, zoom/pan and multi-format export. Written in TypeScript, zero runtime dependencies, ships ESM + CJS + type definitions.
+**[Live demo →](https://whcater.github.io/react-image-studio/)** · **[npm](https://www.npmjs.com/package/react-image-studio)** · **[GitHub](https://github.com/whcater/react-image-studio)**
+
+> A feature-rich, **non-destructive** image editor component for React — crop, rotate, flip, colour filters, freehand brush, **mosaic redaction**, **numbered step markers**, text layers, zoom/pan and multi-format export. Written in TypeScript, zero runtime dependencies, ships ESM + CJS + type definitions.
 
 ```tsx
 import { ImageStudio } from 'react-image-studio';
@@ -102,6 +104,22 @@ editor.current?.crop({ x: 10, y: 10, width: 800, height: 600 });
 editor.current?.undo();
 const snapshot = editor.current?.getDoc();   // JSON-serialisable
 editor.current?.setDoc(snapshot);
+```
+
+### Mosaic and step markers
+
+Both are first-class tools with their own panels, and either can be driven from
+the hook:
+
+```tsx
+const api = useImageStudio({ src });
+
+api.setMosaic({ style: 'pixelate', block: 18, size: 120 }); // redaction brush
+api.setMosaic({ style: 'blur', blur: 14 });
+
+api.setTool('marker');
+api.addMarker({ x: 240, y: 180 });   // number assigned automatically
+api.renumberMarkers();               // re-sequence 1..n after deletions
 ```
 
 ### Using the state hook directly
@@ -223,6 +241,7 @@ Remote images are fetched with `crossOrigin="anonymous"` so exports stay untaint
 
 ```bash
 npm run build      # ESM + CJS + d.ts + style.css
+npm run build:site # docs/ bundle for the GitHub Pages demo
 npm run typecheck  # strict tsc, no emit
 npm test           # node:test suite (89 tests)
 npm run clean
