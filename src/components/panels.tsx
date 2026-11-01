@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStudio } from '../context.js';
-import { ADJUST_DEFINITIONS, FILTER_PRESETS, adjustmentsForPreset } from '../core/filters.js';
-import { CROP_ASPECTS } from '../i18n.js';
+import { ADJUST_DEFINITIONS, ADJUST_SECTIONS, FILTER_PRESETS, adjustmentsForPreset } from '../core/filters.js';
+import { CROP_ASPECTS, EN_LABELS } from '../i18n.js';
 import { renderThumbnail } from '../core/render.js';
 import type { ExportFormat, MarkerShape, MosaicStyle, TextAlign } from '../types.js';
 import { Button, ColorField, Panel, Segmented, Slider } from './ui.js';
@@ -30,23 +30,32 @@ export function AdjustPanel() {
         </Button>
       }
     >
-      <div className="ris-stack">
-        {ADJUST_DEFINITIONS.map((definition) => (
-          <Slider
-            key={definition.key}
-            label={labels.adjust[definition.key]}
-            value={doc.adjust[definition.key]}
-            min={definition.min}
-            max={definition.max}
-            step={definition.step}
-            unit={definition.unit}
-            neutral={definition.neutral}
-            onBegin={api.beginTransient}
-            onChange={(value) => api.setAdjust(definition.key, value)}
-            onCommit={api.endTransient}
-          />
-        ))}
-      </div>
+      {ADJUST_SECTIONS.map((section) => (
+        <section className="ris-section" key={section.id}>
+          <h4 className="ris-section__title">
+            {labels.sections?.[section.id] ?? EN_LABELS.sections?.[section.id] ?? ''}
+          </h4>
+          <div className="ris-stack">
+            {ADJUST_DEFINITIONS.filter((definition) => section.keys.includes(definition.key)).map(
+              (definition) => (
+                <Slider
+                  key={definition.key}
+                  label={labels.adjust[definition.key]}
+                  value={doc.adjust[definition.key]}
+                  min={definition.min}
+                  max={definition.max}
+                  step={definition.step}
+                  unit={definition.unit}
+                  neutral={definition.neutral}
+                  onBegin={api.beginTransient}
+                  onChange={(value) => api.setAdjust(definition.key, value)}
+                  onCommit={api.endTransient}
+                />
+              ),
+            )}
+          </div>
+        </section>
+      ))}
     </Panel>
   );
 }

@@ -3,6 +3,27 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/) and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-11-01
+
+### Added
+- The Adjust panel groups its sliders into **Light**, **Color** and **Effects** sections,
+  matching how people reason about a photo instead of one flat list of ten sliders.
+  Exposed as `ADJUST_SECTIONS` plus a new `labels.sections` group (English and `zh-CN`).
+- Slider rails are tinted from the left up to the thumb, so the current value is readable
+  at a glance without reading the number.
+- Two new tests: every adjustment belongs to exactly one section (an ungrouped key would
+  silently disappear from the panel), and every section title is translated in both languages.
+
+### Changed
+- Tool rail labels are 11px instead of 10px, with a taller hit area per tool.
+- The bottom rail actions (undo / redo / reset / replace) form a stable 2×2 grid instead of
+  wrapping unpredictably.
+- The top bar is 52px tall (was 44px) and shows the image dimensions as a chip.
+- `npm run typecheck` invokes TypeScript through `node`, so it also works where
+  `node_modules/.bin` is not executable (e.g. a `noexec` mount).
+- `package-lock.json` catches up its stale root version (1.0.0 → 1.1.1); dependency
+  versions are unchanged.
+
 ## [1.1.1] — 2026-10-22
 
 ### Added

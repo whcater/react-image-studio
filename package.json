@@ -1,6 +1,6 @@
 {
   "name": "react-image-studio",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "A feature-rich, non-destructive image editor component for React (crop, rotate, filters, brush, text, zoom and export).",
   "keywords": [
     "react",
@@ -57,7 +57,7 @@
     "build:site": "node ./scripts/build-site.mjs",
     "prepublishOnly": "npm run clean && npm run build && npm test",
     "test": "node ./scripts/test.mjs",
-    "typecheck": "tsc -p tsconfig.check.json --noEmit"
+    "typecheck": "node ./node_modules/typescript/bin/tsc -p tsconfig.check.json --noEmit"
   },
   "peerDependencies": {
     "react": ">=17",

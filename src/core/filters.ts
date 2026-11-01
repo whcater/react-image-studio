@@ -39,6 +39,19 @@ export const ADJUST_DEFINITIONS: AdjustDefinition[] = [
 
 export const ADJUST_KEYS: AdjustKey[] = ADJUST_DEFINITIONS.map((d) => d.key);
 
+export type AdjustSectionId = 'light' | 'color' | 'effects';
+
+/**
+ * How the adjust sliders are grouped in the UI: exposure first, then colour,
+ * then the "look" effects. Kept here (not in the view) so a test can prove every
+ * adjustment is reachable — an ungrouped key would silently vanish from the panel.
+ */
+export const ADJUST_SECTIONS: Array<{ id: AdjustSectionId; keys: AdjustKey[] }> = [
+  { id: 'light', keys: ['brightness', 'contrast'] },
+  { id: 'color', keys: ['saturation', 'warmth', 'hue'] },
+  { id: 'effects', keys: ['blur', 'grayscale', 'sepia', 'invert', 'opacity'] },
+];
+
 const round = (value: number, digits = 3): number => {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;

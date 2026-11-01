@@ -90,23 +90,24 @@
 .ris-rail__group--end {
   border-top: 1px solid var(--ris-border);
   padding-top: 8px;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .ris-tool {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 4px;
+  gap: 4px;
+  min-height: 54px;
+  padding: 9px 4px 8px;
   border: 0;
   border-radius: var(--ris-radius-sm);
   background: transparent;
   color: var(--ris-muted);
   font: inherit;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -156,8 +157,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 44px;
-  padding: 0 12px;
+  height: 52px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--ris-border);
   background: var(--ris-bg);
   flex: 0 0 auto;
@@ -180,6 +181,10 @@
 }
 
 .ris-topbar__meta {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--ris-surface-2);
   font-family: var(--ris-mono);
   font-size: 11px;
   color: var(--ris-muted);
@@ -419,6 +424,27 @@
   gap: 4px;
 }
 
+/* Grouped slider sections inside a panel (Light / Color / Effects). */
+.ris-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ris-section + .ris-section {
+  padding-top: 14px;
+  border-top: 1px solid var(--ris-border);
+}
+
+.ris-section__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ris-muted);
+}
+
 .ris-panel__hint {
   margin: 0;
   color: var(--ris-muted);
@@ -572,7 +598,11 @@
 .ris-slider__input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: var(--ris-surface-3);
+  background: linear-gradient(
+    to right,
+    var(--ris-accent) 0 var(--ris-fill, 0%),
+    var(--ris-surface-3) var(--ris-fill, 0%) 100%
+  );
 }
 
 .ris-slider__input::-webkit-slider-thumb {
@@ -591,6 +621,12 @@
   height: 4px;
   border-radius: 999px;
   background: var(--ris-surface-3);
+}
+
+.ris-slider__input::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ris-accent);
 }
 
 .ris-slider__input::-moz-range-thumb {

@@ -25,6 +25,11 @@ export const EN_LABELS: Labels = {
     invert: 'Invert',
     opacity: 'Opacity',
   },
+  sections: {
+    light: 'Light',
+    color: 'Color',
+    effects: 'Effects',
+  },
   presets: {
     original: 'Original',
     vivid: 'Vivid',
@@ -150,6 +155,11 @@ export const ZH_CN_LABELS: Labels = {
     sepia: '复古',
     invert: '反色',
     opacity: '不透明度',
+  },
+  sections: {
+    light: '光线',
+    color: '色彩',
+    effects: '效果',
   },
   presets: {
     original: '原图',
@@ -278,6 +288,7 @@ export function resolveLabels(input?: Partial<Labels> | 'zh-CN'): Labels {
   return {
     tools: { ...EN_LABELS.tools, ...input.tools },
     adjust: { ...EN_LABELS.adjust, ...input.adjust },
+    sections: { ...EN_LABELS.sections, ...input.sections } as Labels['sections'],
     presets: { ...EN_LABELS.presets, ...input.presets },
     aspects: { ...EN_LABELS.aspects, ...input.aspects },
     app: { ...EN_LABELS.app, ...input.app },

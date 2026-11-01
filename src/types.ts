@@ -204,6 +204,15 @@ export interface SaveResult {
 export interface Labels {
   tools: Record<ToolId, string>;
   adjust: Record<AdjustKey, string>;
+  /**
+   * Titles for the Adjust panel's slider groups. Optional so hand-written
+   * `Labels` objects keep compiling; `resolveLabels` always fills them in.
+   */
+  sections?: {
+    light: string;
+    color: string;
+    effects: string;
+  };
   presets: Record<string, string>;
   aspects: Record<string, string>;
   app: {

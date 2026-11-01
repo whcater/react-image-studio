@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   ADJUST_DEFINITIONS,
+  ADJUST_KEYS,
+  ADJUST_SECTIONS,
   FILTER_PRESETS,
   adjustmentsForPreset,
   buildFilterString,
@@ -12,7 +14,7 @@ import {
   neutralAdjustments,
   sanitizeAdjustments,
 } from '../src/core/filters.js';
-import { EN_LABELS } from '../src/i18n.js';
+import { EN_LABELS, ZH_CN_LABELS } from '../src/i18n.js';
 
 const adjustWith = (patch: Partial<ReturnType<typeof neutralAdjustments>>) =>
   sanitizeAdjustments({ ...neutralAdjustments(), ...patch });
@@ -72,4 +74,21 @@ test('describeAdjustments lists only non neutral values', () => {
   const text = describeAdjustments(adjustWith({ brightness: 110, blur: 2 }), EN_LABELS.adjust);
   assert.equal(text, 'Brightness 110% · Blur 2px');
   assert.equal(describeAdjustments(neutralAdjustments(), EN_LABELS.adjust), '');
+});
+
+test('every adjustment belongs to exactly one panel section', () => {
+  const grouped = ADJUST_SECTIONS.flatMap((section) => section.keys);
+  assert.deepEqual(
+    [...grouped].sort(),
+    [...ADJUST_KEYS].sort(),
+    'a key missing from ADJUST_SECTIONS would never render in the Adjust panel',
+  );
+  assert.equal(new Set(grouped).size, grouped.length, 'a key is listed in two sections');
+});
+
+test('every panel section has a translated title in both languages', () => {
+  for (const section of ADJUST_SECTIONS) {
+    assert.ok(EN_LABELS.sections?.[section.id], `missing en title for ${section.id}`);
+    assert.ok(ZH_CN_LABELS.sections?.[section.id], `missing zh title for ${section.id}`);
+  }
 });

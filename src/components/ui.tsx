@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 import { useCallback, useId, useRef } from 'react';
 import { Icon, type IconName } from './icons.js';
 
@@ -93,6 +93,10 @@ export function Slider({
   const display = step < 1 ? value.toFixed(2) : Math.round(value).toString();
   const isNeutral = neutral === undefined ? false : Math.abs(value - neutral) < 1e-6;
 
+  // Fraction of the track already covered, so the rail can be tinted up to the
+  // thumb (a bare <input type="range"> has no cross-browser fill).
+  const fill = max === min ? 0 : Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+
   return (
     <div className={`ris-slider${disabled ? ' is-disabled' : ''}`}>
       <div className="ris-slider__head">
@@ -124,6 +128,7 @@ export function Slider({
         step={step}
         value={value}
         disabled={disabled}
+        style={{ '--ris-fill': `${fill}%` } as CSSProperties}
         onChange={(event) => {
           begin();
           onChange(Number(event.currentTarget.value));

@@ -40,6 +40,7 @@ export type {
 export { EN_LABELS, ZH_CN_LABELS, CROP_ASPECTS, resolveLabels } from './i18n.js';
 export {
   ADJUST_DEFINITIONS,
+  ADJUST_SECTIONS,
   DEFAULT_ADJUSTMENTS,
   FILTER_PRESETS,
   adjustmentsForPreset,
@@ -63,6 +64,6 @@ export { createHistory, commit, canUndo, canRedo, undo, redo, HISTORY_LIMIT } fr
 export type { HistoryState, HistorySlot } from './core/history.js';
 export { initialDoc, cloneDoc, normalizeDoc } from './core/doc.js';
 
-export const VERSION = '1.1.1';
+export const VERSION = '1.2.0';
 
 export { ImageStudio as default } from './ImageStudio.js';
